@@ -274,7 +274,28 @@ if clientes:
 
     if st.button("Salvar Alterações"):
 
-        # ====================================
+        cliente["nome"] = novo_nome
+        cliente["whatsapp"] = novo_whatsapp
+        cliente["usuario"] = novo_usuario
+        cliente["senha"] = nova_senha
+        cliente["valor"] = novo_valor
+
+        ARQ.write_text(
+            json.dumps(
+                clientes,
+                indent=4,
+                ensure_ascii=False
+            ),
+            encoding="utf-8"
+        )
+
+        st.success(
+            "Cliente atualizado."
+        )
+
+        st.rerun()
+
+# ====================================
 # AÇÕES DO CLIENTE
 # ====================================
 
