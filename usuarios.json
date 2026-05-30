@@ -2,7 +2,8 @@
     "usuarios": [
         {
             "usuario": "admin",
-            "senha": "123456"
+            "senha": "123456",
+            "nivel": "Administrador"
         }
     ]
 }
