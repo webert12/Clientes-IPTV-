@@ -458,3 +458,88 @@ if clientes:
                 )
 
                 st.rerun()
+
+# ====================================
+# CADASTRO INDIVIDUAL
+# ====================================
+
+st.divider()
+
+st.subheader("➕ Cadastrar Cliente")
+
+with st.form("cadastro_cliente"):
+
+    nome = st.text_input("Nome")
+
+    whatsapp = st.text_input(
+        "WhatsApp"
+    )
+
+    usuario = st.text_input(
+        "Usuário IPTV"
+    )
+
+    senha = st.text_input(
+        "Senha IPTV"
+    )
+
+    valor = st.number_input(
+        "Valor Mensal",
+        min_value=0.0,
+        value=25.0,
+        step=1.0
+    )
+
+    vencimento = st.date_input(
+        "Data de Vencimento"
+    )
+
+    observacao = st.text_area(
+        "Observações"
+    )
+
+    cadastrar = st.form_submit_button(
+        "Cadastrar Cliente"
+    )
+
+    if cadastrar:
+
+        clientes.append({
+
+            "nome": nome,
+
+            "whatsapp": whatsapp,
+
+            "usuario": usuario,
+
+            "senha": senha,
+
+            "valor": valor,
+
+            "observacao": observacao,
+
+            "vencimento": vencimento.strftime(
+                "%d/%m/%Y"
+            ),
+
+            "status": "Pendente"
+
+        })
+
+        ARQ.write_text(
+
+            json.dumps(
+                clientes,
+                indent=4,
+                ensure_ascii=False
+            ),
+
+            encoding="utf-8"
+
+        )
+
+        st.success(
+            "Cliente cadastrado com sucesso."
+        )
+
+        st.rerun()
