@@ -1,41 +1,46 @@
 import streamlit as st
 import json
+import pandas as pd
+import plotly.express as px
 from pathlib import Path
 from datetime import datetime
-import pandas as pd
 
-st.set_page_config(layout="wide")
+st.title("📊 Dashboard Vision Play TV")
 
-st.title("📊 Dashboard Gerencial")
+ARQ_CLIENTES = Path("clientes.json")
+ARQ_HISTORICO = Path("historico.json")
 
-ARQ = Path("clientes.json")
+if not ARQ_CLIENTES.exists():
+    ARQ_CLIENTES.write_text("[]", encoding="utf-8")
 
-if not ARQ.exists():
-    ARQ.write_text("[]", encoding="utf-8")
+if not ARQ_HISTORICO.exists():
+    ARQ_HISTORICO.write_text("[]", encoding="utf-8")
 
 clientes = json.loads(
-    ARQ.read_text(encoding="utf-8")
+    ARQ_CLIENTES.read_text(encoding="utf-8")
+)
+
+historico = json.loads(
+    ARQ_HISTORICO.read_text(encoding="utf-8")
 )
 
 hoje = datetime.now().date()
 
 total_clientes = len(clientes)
 
-ativos = 0
+em_dia = 0
 vencendo = 0
 vencidos = 0
 
 receita_prevista = 0
 receita_recebida = 0
-receita_pendente = 0
 
 for cliente in clientes:
 
+    valor = float(cliente.get("valor", 0))
+    receita_prevista += valor
+
     try:
-
-        valor = float(cliente.get("valor", 0))
-
-        receita_prevista += valor
 
         vencimento = datetime.strptime(
             cliente["vencimento"],
@@ -45,121 +50,128 @@ for cliente in clientes:
         dias = (vencimento - hoje).days
 
         if dias < 0:
-
             vencidos += 1
-            receita_pendente += valor
 
         elif dias <= 2:
-
             vencendo += 1
-            receita_pendente += valor
 
         else:
-
-            ativos += 1
-
-        if cliente.get("status") == "Recebido":
-
-            receita_recebida += valor
+            em_dia += 1
 
     except:
         pass
 
-col1, col2, col3, col4 = st.columns(4)
+for item in historico:
+
+    receita_recebida += float(
+        item.get("valor", 0)
+    )
+
+receita_pendente = (
+    receita_prevista - receita_recebida
+)
+
+# ==========================
+# CARDS
+# ==========================
+
+c1, c2, c3, c4 = st.columns(4)
+
+c1.metric(
+    "👥 Clientes",
+    total_clientes
+)
+
+c2.metric(
+    "💰 Previsto",
+    f"R$ {receita_prevista:.2f}"
+)
+
+c3.metric(
+    "✅ Recebido",
+    f"R$ {receita_recebida:.2f}"
+)
+
+c4.metric(
+    "⚠️ Pendente",
+    f"R$ {receita_pendente:.2f}"
+)
+
+st.divider()
+
+# ==========================
+# GRÁFICOS
+# ==========================
+
+col1, col2 = st.columns(2)
 
 with col1:
-    st.metric(
-        "👥 Clientes",
-        total_clientes
+
+    df_status = pd.DataFrame({
+
+        "Status": [
+            "Em Dia",
+            "Vencendo",
+            "Vencidos"
+        ],
+
+        "Quantidade": [
+            em_dia,
+            vencendo,
+            vencidos
+        ]
+
+    })
+
+    fig = px.pie(
+        df_status,
+        names="Status",
+        values="Quantidade",
+        title="Clientes"
+    )
+
+    st.plotly_chart(
+        fig,
+        use_container_width=True
     )
 
 with col2:
-    st.metric(
-        "🟢 Ativos",
-        ativos
+
+    df_financeiro = pd.DataFrame({
+
+        "Tipo": [
+            "Recebido",
+            "Pendente"
+        ],
+
+        "Valor": [
+            receita_recebida,
+            receita_pendente
+        ]
+
+    })
+
+    fig2 = px.pie(
+        df_financeiro,
+        names="Tipo",
+        values="Valor",
+        title="Financeiro"
     )
 
-with col3:
-    st.metric(
-        "🟡 Vencendo",
-        vencendo
-    )
-
-with col4:
-    st.metric(
-        "🔴 Vencidos",
-        vencidos
-    )
-
-st.divider()
-
-col5, col6, col7 = st.columns(3)
-
-with col5:
-    st.metric(
-        "💰 Receita Prevista",
-        f"R$ {receita_prevista:,.2f}"
-    )
-
-with col6:
-    st.metric(
-        "✅ Recebido",
-        f"R$ {receita_recebida:,.2f}"
-    )
-
-with col7:
-    st.metric(
-        "⚠️ Pendente",
-        f"R$ {receita_pendente:,.2f}"
+    st.plotly_chart(
+        fig2,
+        use_container_width=True
     )
 
 st.divider()
 
-st.subheader("📈 Clientes por Status")
+# ==========================
+# CLIENTES VENCENDO
+# ==========================
 
-dados_status = pd.DataFrame({
-    "Status": [
-        "Ativos",
-        "Vencendo",
-        "Vencidos"
-    ],
-    "Quantidade": [
-        ativos,
-        vencendo,
-        vencidos
-    ]
-})
+st.subheader("⚠️ Clientes Próximos do Vencimento")
 
-st.bar_chart(
-    dados_status.set_index("Status")
-)
-
-st.divider()
-
-st.subheader("💰 Receita")
-
-dados_receita = pd.DataFrame({
-    "Categoria": [
-        "Prevista",
-        "Recebida",
-        "Pendente"
-    ],
-    "Valor": [
-        receita_prevista,
-        receita_recebida,
-        receita_pendente
-    ]
-})
-
-st.bar_chart(
-    dados_receita.set_index("Categoria")
-)
-
-st.divider()
-
-st.subheader("⚠️ Clientes que Exigem Atenção")
-
-lista_alertas = []
+alertas = []
 
 for cliente in clientes:
 
@@ -170,28 +182,64 @@ for cliente in clientes:
             "%d/%m/%Y"
         ).date()
 
-        dias = (vencimento - hoje).days
+        dias = (
+            vencimento - hoje
+        ).days
 
         if dias <= 2:
 
-            lista_alertas.append({
-                "Cliente": cliente["nome"],
-                "Vencimento": cliente["vencimento"],
-                "Dias": dias
+            alertas.append({
+
+                "Nome":
+                    cliente["nome"],
+
+                "WhatsApp":
+                    cliente["whatsapp"],
+
+                "Vencimento":
+                    cliente["vencimento"]
+
             })
 
     except:
         pass
 
-if lista_alertas:
+if alertas:
 
     st.dataframe(
-        pd.DataFrame(lista_alertas),
-        use_container_width=True
+        pd.DataFrame(alertas),
+        use_container_width=True,
+        hide_index=True
     )
 
 else:
 
     st.success(
         "Nenhum cliente próximo do vencimento."
+    )
+
+st.divider()
+
+# ==========================
+# ÚLTIMOS RECEBIMENTOS
+# ==========================
+
+st.subheader("💵 Últimos Recebimentos")
+
+if historico:
+
+    ultimos = list(
+        reversed(historico)
+    )[:10]
+
+    st.dataframe(
+        pd.DataFrame(ultimos),
+        use_container_width=True,
+        hide_index=True
+    )
+
+else:
+
+    st.info(
+        "Nenhum recebimento registrado."
     )
