@@ -12,9 +12,7 @@ ARQ = Path("clientes.json")
 if not ARQ.exists():
     ARQ.write_text("[]", encoding="utf-8")
 
-clientes = json.loads(
-    ARQ.read_text(encoding="utf-8")
-)
+clientes = json.loads(ARQ.read_text(encoding="utf-8"))
 
 # ====================================
 # IMPORTAÇÃO EM MASSA
@@ -23,7 +21,6 @@ clientes = json.loads(
 with st.expander("📥 Importar Clientes em Massa"):
 
     texto = st.text_area("Cole usuários e senhas aqui", height=250)
-
     valor_padrao = st.number_input("Valor Mensal", value=25.0, step=1.0)
 
     if st.button("Importar Clientes"):
@@ -71,6 +68,26 @@ with st.expander("📥 Importar Clientes em Massa"):
         st.rerun()
 
 # ====================================
+# STATUS FORMATADO (NOVA MELHORIA)
+# ====================================
+
+def format_status(row):
+
+    if row["Pagamento"] == "Recebido":
+        return ["background-color: #2ecc71; color: white;"] * len(row)
+
+    if row["Pagamento"] == "Pendente":
+        return ["background-color: #f1c40f; color: black;"] * len(row)
+
+    if row["Status"] == "Vencido":
+        return ["background-color: #e74c3c; color: white;"] * len(row)
+
+    if row["Status"] == "Em Dia":
+        return ["background-color: #3498db; color: white;"] * len(row)
+
+    return [""] * len(row)
+
+# ====================================
 # PESQUISA
 # ====================================
 
@@ -88,7 +105,6 @@ status_filtro = st.selectbox(
 # ====================================
 
 hoje = datetime.now().date()
-
 dados = []
 
 for i, cliente in enumerate(clientes):
@@ -115,11 +131,22 @@ for i, cliente in enumerate(clientes):
     if status_filtro != "Todos":
 
         if status_filtro in ["Em Dia", "Vencendo", "Vencido"]:
+
             if situacao != status_filtro:
                 continue
+
         else:
+
             if cliente["status"] != status_filtro:
                 continue
+
+    # ÍCONES AUTOMÁTICOS
+    if cliente["status"] == "Recebido":
+        pagamento = "💰 Recebido"
+    elif cliente["status"] == "Pendente":
+        pagamento = "⏳ Pendente"
+    else:
+        pagamento = cliente["status"]
 
     dados.append({
         "ID": i,
@@ -129,33 +156,23 @@ for i, cliente in enumerate(clientes):
         "Valor": f"R$ {cliente['valor']:.2f}",
         "Vencimento": cliente["vencimento"],
         "Status": situacao,
-        "Pagamento": cliente["status"]
+        "Pagamento": pagamento
     })
 
 # ====================================
-# TABELA PROFISSIONAL (COM CORES)
+# TABELA PROFISSIONAL (VISUAL PREMIUM)
 # ====================================
 
 st.subheader("📋 Lista de Clientes")
-
-def color_pagamento(val):
-    if val == "Recebido":
-        return "background-color: #2ecc71; color: white;"
-    elif val == "Pendente":
-        return "background-color: #f1c40f; color: black;"
-    return ""
 
 if dados:
 
     df = pd.DataFrame(dados)
 
-    styled_df = df.style.applymap(
-        color_pagamento,
-        subset=["Pagamento"]
-    )
+    styled = df.style.apply(format_status, axis=1)
 
     st.dataframe(
-        styled_df,
+        styled,
         use_container_width=True,
         hide_index=True
     )
@@ -183,16 +200,17 @@ with st.expander("✏️ Editar Cliente", expanded=False):
         novo_whatsapp = st.text_input("WhatsApp", cliente["whatsapp"])
         novo_usuario = st.text_input("Usuário IPTV", cliente["usuario"])
         nova_senha = st.text_input("Senha IPTV", cliente["senha"])
-
         novo_valor = st.number_input("Valor", value=float(cliente["valor"]))
 
         if st.button("Salvar Alterações"):
 
-            cliente["nome"] = novo_nome
-            cliente["whatsapp"] = novo_whatsapp
-            cliente["usuario"] = novo_usuario
-            cliente["senha"] = nova_senha
-            cliente["valor"] = novo_valor
+            cliente.update({
+                "nome": novo_nome,
+                "whatsapp": novo_whatsapp,
+                "usuario": novo_usuario,
+                "senha": nova_senha,
+                "valor": novo_valor
+            })
 
             ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
 
@@ -234,30 +252,26 @@ if clientes:
 
         if st.button("💵 Receber Pagamento"):
 
-            try:
-                vencimento = datetime.strptime(cliente_acao["vencimento"], "%d/%m/%Y")
+            vencimento = datetime.strptime(cliente_acao["vencimento"], "%d/%m/%Y")
 
-                mes = vencimento.month + 1
-                ano = vencimento.year
+            mes = vencimento.month + 1
+            ano = vencimento.year
 
-                if mes > 12:
-                    mes = 1
-                    ano += 1
+            if mes > 12:
+                mes = 1
+                ano += 1
 
-                dia = min(vencimento.day, monthrange(ano, mes)[1])
+            dia = min(vencimento.day, monthrange(ano, mes)[1])
 
-                novo_vencimento = datetime(ano, mes, dia)
+            novo_vencimento = datetime(ano, mes, dia)
 
-                cliente_acao["vencimento"] = novo_vencimento.strftime("%d/%m/%Y")
-                cliente_acao["status"] = "Recebido"
+            cliente_acao["vencimento"] = novo_vencimento.strftime("%d/%m/%Y")
+            cliente_acao["status"] = "Recebido"
 
-                ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
+            ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
 
-                st.success("Pagamento confirmado.")
-                st.rerun()
-
-            except Exception as erro:
-                st.error(f"Erro: {erro}")
+            st.success("Pagamento confirmado.")
+            st.rerun()
 
     with col3:
 
@@ -272,6 +286,56 @@ if clientes:
                 ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
 
                 st.warning("Cliente removido.")
+                st.rerun()
+
+# ====================================
+# COBRAR TODOS (NOVA FUNÇÃO)
+# ====================================
+
+st.divider()
+
+st.subheader("📣 Cobrança em Massa")
+
+if clientes:
+
+    if st.button("📲 Cobrar Todos os Inadimplentes"):
+
+        inadimplentes = []
+
+        for c in clientes:
+
+            try:
+                venc = datetime.strptime(c["vencimento"], "%d/%m/%Y").date()
+                hoje = datetime.now().date()
+
+                if venc < hoje or c["status"] == "Pendente":
+                    inadimplentes.append(c)
+
+            except:
+                continue
+
+        if not inadimplentes:
+            st.success("Nenhum cliente pendente 👍")
+
+        else:
+            st.warning(f"{len(inadimplentes)} clientes encontrados para cobrança")
+
+            for c in inadimplentes:
+
+                whatsapp = str(c.get("whatsapp", "")).replace("+", "").replace(" ", "")
+
+                mensagem = (
+                    f"Olá {c['nome']} 👋\n\n"
+                    f"Identificamos que seu acesso está pendente.\n"
+                    f"Solicitamos a regularização para evitar bloqueio.\n\n"
+                    f"Qualquer dúvida, estamos à disposição."
+                )
+
+                if whatsapp:
+                    st.link_button(
+                        f"📲 Cobrar {c['nome']}",
+                        f"https://wa.me/55{whatsapp}?text={mensagem}"
+                    )
                 st.rerun()
 
 # ====================================
