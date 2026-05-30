@@ -289,7 +289,7 @@ if clientes:
                 st.rerun()
 
 # ====================================
-# COBRAR TODOS (NOVA FUNÇÃO)
+# COBRAR TODOS (CORRIGIDO E FUNCIONAL)
 # ====================================
 
 st.divider()
@@ -298,15 +298,16 @@ st.subheader("📣 Cobrança em Massa")
 
 if clientes:
 
-    if st.button("📲 Cobrar Todos os Inadimplentes"):
+    if st.button("📲 Gerar Cobrança em Massa"):
 
         inadimplentes = []
+
+        hoje = datetime.now().date()
 
         for c in clientes:
 
             try:
                 venc = datetime.strptime(c["vencimento"], "%d/%m/%Y").date()
-                hoje = datetime.now().date()
 
                 if venc < hoje or c["status"] == "Pendente":
                     inadimplentes.append(c)
@@ -318,25 +319,39 @@ if clientes:
             st.success("Nenhum cliente pendente 👍")
 
         else:
-            st.warning(f"{len(inadimplentes)} clientes encontrados para cobrança")
+            st.warning(f"{len(inadimplentes)} clientes para cobrança")
 
-            for c in inadimplentes:
+            st.session_state["lista_cobranca"] = inadimplentes
 
-                whatsapp = str(c.get("whatsapp", "")).replace("+", "").replace(" ", "")
+# ====================================
+# LISTA DE COBRANÇA GERADA
+# ====================================
 
-                mensagem = (
-                    f"Olá {c['nome']} 👋\n\n"
-                    f"Identificamos que seu acesso está pendente.\n"
-                    f"Solicitamos a regularização para evitar bloqueio.\n\n"
-                    f"Qualquer dúvida, estamos à disposição."
-                )
+if "lista_cobranca" in st.session_state:
 
-                if whatsapp:
-                    st.link_button(
-                        f"📲 Cobrar {c['nome']}",
-                        f"https://wa.me/55{whatsapp}?text={mensagem}"
-                    )
-                st.rerun()
+    st.markdown("### 📲 Lista de cobrança gerada")
+
+    for c in st.session_state["lista_cobranca"]:
+
+        whatsapp = str(c.get("whatsapp", "")).replace("+", "").replace(" ", "")
+
+        mensagem = (
+            f"Olá {c['nome']} 👋\n\n"
+            f"Identificamos que seu acesso está pendente.\n"
+            f"Solicitamos a regularização para evitar bloqueio.\n\n"
+            f"Qualquer dúvida, estamos à disposição."
+        )
+
+        if whatsapp:
+
+            st.link_button(
+                f"📲 Cobrar {c['nome']}",
+                f"https://wa.me/55{whatsapp}?text={mensagem}"
+            )
+
+    if st.button("🧹 Limpar Lista de Cobrança"):
+        del st.session_state["lista_cobranca"]
+        st.rerun()
 
 # ====================================
 # CADASTRO INDIVIDUAL
