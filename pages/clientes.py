@@ -225,9 +225,9 @@ else:
 
 st.divider()
 
-st.subheader("✏️ Editar Cliente")
+with st.expander("✏️ Editar Cliente", expanded=False):
 
-if clientes:
+    if clientes:
 
     nomes = [
         c["nome"]
@@ -465,9 +465,9 @@ if clientes:
 
 st.divider()
 
-st.subheader("➕ Cadastrar Cliente")
+with st.expander("➕ Cadastrar Cliente", expanded=False):
 
-with st.form("cadastro_cliente"):
+    with st.form("cadastro_cliente"):
 
     nome = st.text_input("Nome")
 
