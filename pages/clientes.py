@@ -22,32 +22,21 @@ clientes = json.loads(
 
 with st.expander("📥 Importar Clientes em Massa"):
 
-    texto = st.text_area(
-        "Cole usuários e senhas aqui",
-        height=250
-    )
+    texto = st.text_area("Cole usuários e senhas aqui", height=250)
 
-    valor_padrao = st.number_input(
-        "Valor Mensal",
-        value=25.0,
-        step=1.0
-    )
+    valor_padrao = st.number_input("Valor Mensal", value=25.0, step=1.0)
 
     if st.button("Importar Clientes"):
 
-        linhas = [
-            l.strip()
-            for l in texto.splitlines()
-            if l.strip()
-        ]
+        linhas = [l.strip() for l in texto.splitlines() if l.strip()]
 
         novos = 0
         i = 0
 
-        while i < len(linhas)-1:
+        while i < len(linhas) - 1:
 
             usuario = linhas[i]
-            senha = linhas[i+1]
+            senha = linhas[i + 1]
 
             hoje = datetime.now()
 
@@ -58,19 +47,11 @@ with st.expander("📥 Importar Clientes em Massa"):
                 mes = 1
                 ano += 1
 
-            dia = min(
-                hoje.day,
-                monthrange(ano, mes)[1]
-            )
+            dia = min(hoje.day, monthrange(ano, mes)[1])
 
-            vencimento = datetime(
-                ano,
-                mes,
-                dia
-            ).strftime("%d/%m/%Y")
+            vencimento = datetime(ano, mes, dia).strftime("%d/%m/%Y")
 
             clientes.append({
-
                 "nome": usuario,
                 "whatsapp": "",
                 "usuario": usuario,
@@ -79,20 +60,12 @@ with st.expander("📥 Importar Clientes em Massa"):
                 "observacao": "",
                 "vencimento": vencimento,
                 "status": "Pendente"
-
             })
 
             novos += 1
             i += 2
 
-        ARQ.write_text(
-            json.dumps(
-                clientes,
-                indent=4,
-                ensure_ascii=False
-            ),
-            encoding="utf-8"
-        )
+        ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
 
         st.success(f"{novos} clientes importados.")
         st.rerun()
@@ -107,14 +80,7 @@ pesquisa = st.text_input("Pesquisar cliente")
 
 status_filtro = st.selectbox(
     "Filtrar por Status",
-    [
-        "Todos",
-        "Em Dia",
-        "Vencendo",
-        "Vencido",
-        "Recebido",
-        "Pendente"
-    ]
+    ["Todos", "Em Dia", "Vencendo", "Vencido", "Recebido", "Pendente"]
 )
 
 # ====================================
@@ -128,11 +94,7 @@ dados = []
 for i, cliente in enumerate(clientes):
 
     try:
-        venc = datetime.strptime(
-            cliente["vencimento"],
-            "%d/%m/%Y"
-        ).date()
-
+        venc = datetime.strptime(cliente["vencimento"], "%d/%m/%Y").date()
         dias = (venc - hoje).days
 
         if dias < 0:
@@ -145,11 +107,7 @@ for i, cliente in enumerate(clientes):
     except:
         situacao = "Desconhecido"
 
-    texto = (
-        cliente["nome"]
-        + cliente["usuario"]
-        + cliente["whatsapp"]
-    ).lower()
+    texto = (cliente["nome"] + cliente["usuario"] + cliente["whatsapp"]).lower()
 
     if pesquisa.lower() not in texto:
         continue
@@ -157,12 +115,9 @@ for i, cliente in enumerate(clientes):
     if status_filtro != "Todos":
 
         if status_filtro in ["Em Dia", "Vencendo", "Vencido"]:
-
             if situacao != status_filtro:
                 continue
-
         else:
-
             if cliente["status"] != status_filtro:
                 continue
 
@@ -178,14 +133,33 @@ for i, cliente in enumerate(clientes):
     })
 
 # ====================================
-# TABELA PROFISSIONAL
+# TABELA PROFISSIONAL (COM CORES)
 # ====================================
 
 st.subheader("📋 Lista de Clientes")
 
+def color_pagamento(val):
+    if val == "Recebido":
+        return "background-color: #2ecc71; color: white;"
+    elif val == "Pendente":
+        return "background-color: #f1c40f; color: black;"
+    return ""
+
 if dados:
+
     df = pd.DataFrame(dados)
-    st.dataframe(df, use_container_width=True, hide_index=True)
+
+    styled_df = df.style.applymap(
+        color_pagamento,
+        subset=["Pagamento"]
+    )
+
+    st.dataframe(
+        styled_df,
+        use_container_width=True,
+        hide_index=True
+    )
+
 else:
     st.warning("Nenhum cliente encontrado.")
 
@@ -201,24 +175,16 @@ with st.expander("✏️ Editar Cliente", expanded=False):
 
         nomes = [c["nome"] for c in clientes]
 
-        selecionado = st.selectbox(
-            "Selecione o Cliente",
-            nomes
-        )
+        selecionado = st.selectbox("Selecione o Cliente", nomes)
 
-        cliente = next(
-            c for c in clientes if c["nome"] == selecionado
-        )
+        cliente = next(c for c in clientes if c["nome"] == selecionado)
 
         novo_nome = st.text_input("Nome", cliente["nome"])
         novo_whatsapp = st.text_input("WhatsApp", cliente["whatsapp"])
         novo_usuario = st.text_input("Usuário IPTV", cliente["usuario"])
         nova_senha = st.text_input("Senha IPTV", cliente["senha"])
 
-        novo_valor = st.number_input(
-            "Valor",
-            value=float(cliente["valor"])
-        )
+        novo_valor = st.number_input("Valor", value=float(cliente["valor"]))
 
         if st.button("Salvar Alterações"):
 
@@ -228,10 +194,7 @@ with st.expander("✏️ Editar Cliente", expanded=False):
             cliente["senha"] = nova_senha
             cliente["valor"] = novo_valor
 
-            ARQ.write_text(
-                json.dumps(clientes, indent=4, ensure_ascii=False),
-                encoding="utf-8"
-            )
+            ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
 
             st.success("Cliente atualizado.")
             st.rerun()
@@ -248,15 +211,9 @@ if clientes:
 
     nomes_clientes = [c["nome"] for c in clientes]
 
-    cliente_acao_nome = st.selectbox(
-        "Selecionar Cliente",
-        nomes_clientes,
-        key="acoes_cliente"
-    )
+    cliente_acao_nome = st.selectbox("Selecionar Cliente", nomes_clientes, key="acoes_cliente")
 
-    cliente_acao = next(
-        c for c in clientes if c["nome"] == cliente_acao_nome
-    )
+    cliente_acao = next(c for c in clientes if c["nome"] == cliente_acao_nome)
 
     col1, col2, col3 = st.columns(3)
 
@@ -271,21 +228,14 @@ if clientes:
         )
 
         if whatsapp:
-            st.link_button(
-                "📲 WhatsApp",
-                f"https://wa.me/55{whatsapp}?text={mensagem}"
-            )
+            st.link_button("📲 WhatsApp", f"https://wa.me/55{whatsapp}?text={mensagem}")
 
     with col2:
 
         if st.button("💵 Receber Pagamento"):
 
             try:
-
-                vencimento = datetime.strptime(
-                    cliente_acao["vencimento"],
-                    "%d/%m/%Y"
-                )
+                vencimento = datetime.strptime(cliente_acao["vencimento"], "%d/%m/%Y")
 
                 mes = vencimento.month + 1
                 ano = vencimento.year
@@ -294,20 +244,14 @@ if clientes:
                     mes = 1
                     ano += 1
 
-                dia = min(
-                    vencimento.day,
-                    monthrange(ano, mes)[1]
-                )
+                dia = min(vencimento.day, monthrange(ano, mes)[1])
 
                 novo_vencimento = datetime(ano, mes, dia)
 
                 cliente_acao["vencimento"] = novo_vencimento.strftime("%d/%m/%Y")
                 cliente_acao["status"] = "Recebido"
 
-                ARQ.write_text(
-                    json.dumps(clientes, indent=4, ensure_ascii=False),
-                    encoding="utf-8"
-                )
+                ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
 
                 st.success("Pagamento confirmado.")
                 st.rerun()
@@ -325,10 +269,7 @@ if clientes:
 
                 clientes.remove(cliente_acao)
 
-                ARQ.write_text(
-                    json.dumps(clientes, indent=4, ensure_ascii=False),
-                    encoding="utf-8"
-                )
+                ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
 
                 st.warning("Cliente removido.")
                 st.rerun()
@@ -373,10 +314,7 @@ with st.expander("➕ Cadastrar Cliente", expanded=False):
             "status": "Pendente"
         })
 
-        ARQ.write_text(
-            json.dumps(clientes, indent=4, ensure_ascii=False),
-            encoding="utf-8"
-        )
+        ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
 
         st.success("Cliente cadastrado com sucesso.")
         st.rerun()
