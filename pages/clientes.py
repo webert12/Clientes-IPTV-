@@ -274,23 +274,166 @@ if clientes:
 
     if st.button("Salvar Alterações"):
 
-        cliente["nome"] = novo_nome
-        cliente["whatsapp"] = novo_whatsapp
-        cliente["usuario"] = novo_usuario
-        cliente["senha"] = nova_senha
-        cliente["valor"] = novo_valor
+        # ====================================
+# AÇÕES DO CLIENTE
+# ====================================
 
-        ARQ.write_text(
-            json.dumps(
-                clientes,
-                indent=4,
-                ensure_ascii=False
-            ),
-            encoding="utf-8"
+st.divider()
+
+st.subheader("⚙️ Ações do Cliente")
+
+if clientes:
+
+    nomes_clientes = [
+        c["nome"]
+        for c in clientes
+    ]
+
+    cliente_acao_nome = st.selectbox(
+        "Selecionar Cliente",
+        nomes_clientes,
+        key="acoes_cliente"
+    )
+
+    cliente_acao = next(
+        c
+        for c in clientes
+        if c["nome"] == cliente_acao_nome
+    )
+
+    col1, col2, col3 = st.columns(3)
+
+    # ==========================
+    # WHATSAPP
+    # ==========================
+
+    with col1:
+
+        whatsapp = str(
+            cliente_acao.get(
+                "whatsapp",
+                ""
+            )
+        ).replace(
+            "+", ""
+        ).replace(
+            " ", ""
         )
 
-        st.success(
-            "Cliente atualizado."
+        mensagem = (
+            f"Olá {cliente_acao['nome']}.\n\n"
+            f"Seu acesso Vision Play TV "
+            f"vence em breve.\n\n"
+            f"Entre em contato para renovar."
         )
 
-        st.rerun()
+        if whatsapp:
+
+            st.link_button(
+                "📲 WhatsApp",
+                f"https://wa.me/55{whatsapp}?text={mensagem}"
+            )
+
+    # ==========================
+    # RECEBER
+    # ==========================
+
+    with col2:
+
+        if st.button(
+            "💵 Receber Pagamento"
+        ):
+
+            try:
+
+                vencimento = datetime.strptime(
+                    cliente_acao["vencimento"],
+                    "%d/%m/%Y"
+                )
+
+                mes = vencimento.month + 1
+                ano = vencimento.year
+
+                if mes > 12:
+                    mes = 1
+                    ano += 1
+
+                dia = min(
+                    vencimento.day,
+                    monthrange(
+                        ano,
+                        mes
+                    )[1]
+                )
+
+                novo_vencimento = datetime(
+                    ano,
+                    mes,
+                    dia
+                )
+
+                cliente_acao[
+                    "vencimento"
+                ] = novo_vencimento.strftime(
+                    "%d/%m/%Y"
+                )
+
+                cliente_acao[
+                    "status"
+                ] = "Recebido"
+
+                ARQ.write_text(
+                    json.dumps(
+                        clientes,
+                        indent=4,
+                        ensure_ascii=False
+                    ),
+                    encoding="utf-8"
+                )
+
+                st.success(
+                    "Pagamento confirmado."
+                )
+
+                st.rerun()
+
+            except Exception as erro:
+
+                st.error(
+                    f"Erro: {erro}"
+                )
+
+    # ==========================
+    # EXCLUIR
+    # ==========================
+
+    with col3:
+
+        confirmar = st.checkbox(
+            "Confirmar exclusão"
+        )
+
+        if confirmar:
+
+            if st.button(
+                "🗑️ Excluir Cliente"
+            ):
+
+                clientes.remove(
+                    cliente_acao
+                )
+
+                ARQ.write_text(
+                    json.dumps(
+                        clientes,
+                        indent=4,
+                        ensure_ascii=False
+                    ),
+                    encoding="utf-8"
+                )
+
+                st.warning(
+                    "Cliente removido."
+                )
+
+                st.rerun()
