@@ -160,26 +160,37 @@ for i, cliente in enumerate(clientes):
     })
 
 # ====================================
-# TABELA PROFISSIONAL (VISUAL PREMIUM)
+# TABELA PROFISSIONAL (COM CORES)
 # ====================================
 
 st.subheader("📋 Lista de Clientes")
+
+def color_status(row):
+
+    if "💰" in str(row["Pagamento"]):
+        return ["background-color: #2ecc71; color: white;"] * len(row)
+
+    if "Pendente" in str(row["Pagamento"]):
+        return ["background-color: #f1c40f; color: black;"] * len(row)
+
+    return [""] * len(row)
 
 if dados:
 
     df = pd.DataFrame(dados)
 
-    styled = df.style.apply(format_status, axis=1)
+    # aplica estilo por linha inteira
+    styled_df = df.style.apply(color_status, axis=1)
 
     st.dataframe(
-        styled,
+        styled_df,
         use_container_width=True,
         hide_index=True
     )
 
 else:
     st.warning("Nenhum cliente encontrado.")
-
+    st.rerun()
 # ====================================
 # EDIÇÃO
 # ====================================
