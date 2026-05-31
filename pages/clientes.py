@@ -60,10 +60,8 @@ with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
             # =========================
             # VENCIMENTO FIXO DIA 10
             # =========================
-            hoje = datetime.now()
             ano = hoje.year
             mes = hoje.month
-
             hoje = datetime.now()
 
 # se já passou do dia 10, joga para o próximo mês
