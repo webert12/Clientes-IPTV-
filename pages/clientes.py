@@ -15,56 +15,97 @@ if not ARQ.exists():
 clientes = json.loads(ARQ.read_text(encoding="utf-8"))
 
 # ====================================
-# IMPORTAÇÃO EM MASSA
+# IMPORTAÇÃO EM MASSA INTELIGENTE
 # ====================================
 
-with st.expander("📥 Importar Clientes em Massa"):
+with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
 
-    texto = st.text_area("Cole usuários e senhas aqui", height=250)
+    texto = st.text_area(
+        "Cole usuários / senhas / nomes (qualquer formato)",
+        height=300
+    )
+
     valor_padrao = st.number_input("Valor Mensal", value=25.0, step=1.0)
 
-    if st.button("Importar Clientes"):
+    if st.button("Processar Importação"):
 
         linhas = [l.strip() for l in texto.splitlines() if l.strip()]
 
-        novos = 0
-        i = 0
+        tabela_preview = []
+        clientes_novos = []
 
-        while i < len(linhas) - 1:
+        for linha in linhas:
 
-            usuario = linhas[i]
-            senha = linhas[i + 1]
+            partes = linha.split()
 
-            hoje = datetime.now()
+            # =========================
+            # CASO 3 CAMPOS (nome usuário senha OU usuário senha nome)
+            # =========================
+            if len(partes) >= 3:
 
-            mes = hoje.month + 1
-            ano = hoje.year
+                a, b, c = partes[0], partes[1], " ".join(partes[2:])
 
-            if mes > 12:
-                mes = 1
-                ano += 1
+                # detecta se primeiro é nome ou usuário
+                if any(char.isdigit() for char in a):
+                    usuario = a
+                    senha = b
+                    nome = c
+                else:
+                    nome = a
+                    usuario = b
+                    senha = c
 
-            dia = min(hoje.day, monthrange(ano, mes)[1])
+            # =========================
+            # CASO 2 CAMPOS
+            # =========================
+            elif len(partes) == 2:
 
-            vencimento = datetime(ano, mes, dia).strftime("%d/%m/%Y")
+                usuario = partes[0]
+                senha = partes[1]
+                nome = partes[0]
 
-            clientes.append({
-                "nome": usuario,
+            else:
+                continue
+
+            clientes_novos.append({
+                "nome": nome,
                 "whatsapp": "",
                 "usuario": usuario,
                 "senha": senha,
                 "valor": valor_padrao,
                 "observacao": "",
-                "vencimento": vencimento,
+                "vencimento": datetime.now().strftime("%d/%m/%Y"),
                 "status": "Pendente"
             })
 
-            novos += 1
-            i += 2
+            tabela_preview.append({
+                "Nome": nome,
+                "Usuário": usuario,
+                "Senha": senha
+            })
 
-        ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
+        # salva no sistema
+        clientes.extend(clientes_novos)
 
-        st.success(f"{novos} clientes importados.")
+        ARQ.write_text(
+            json.dumps(clientes, indent=4, ensure_ascii=False),
+            encoding="utf-8"
+        )
+
+        st.success(f"{len(clientes_novos)} clientes importados com sucesso!")
+
+        # ====================================
+        # TABELA DE PREVIEW (NOVO)
+        # ====================================
+
+        if tabela_preview:
+
+            st.subheader("📋 Pré-visualização da Importação")
+
+            df_preview = pd.DataFrame(tabela_preview)
+
+            st.dataframe(df_preview, use_container_width=True, hide_index=True)
+
         st.rerun()
 
 # ====================================
