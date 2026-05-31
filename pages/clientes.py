@@ -289,6 +289,52 @@ if clientes:
                 st.rerun()
 
 # ====================================
+# EXCLUSÃO EM MASSA DE CLIENTES
+# ====================================
+
+st.divider()
+
+st.subheader("🗑️ Exclusão em Massa de Clientes")
+
+if clientes:
+
+    st.write("Selecione os clientes que deseja excluir:")
+
+    # cria lista de seleção
+    selecionados = []
+
+    for i, c in enumerate(clientes):
+
+        col1, col2 = st.columns([0.1, 0.9])
+
+        with col1:
+            marcado = st.checkbox("", key=f"del_{i}")
+
+        with col2:
+            st.write(f"👤 {c['nome']} | 📱 {c.get('whatsapp','')} | 💰 {c.get('status')}")
+
+        if marcado:
+            selecionados.append(c)
+
+    if selecionados:
+
+        st.warning(f"{len(selecionados)} cliente(s) selecionado(s) para exclusão")
+
+        if st.button("🗑️ Excluir Selecionados"):
+
+            for c in selecionados:
+                if c in clientes:
+                    clientes.remove(c)
+
+            ARQ.write_text(
+                json.dumps(clientes, indent=4, ensure_ascii=False),
+                encoding="utf-8"
+            )
+
+            st.success("Clientes excluídos com sucesso.")
+            st.rerun()
+
+# ====================================
 # COBRAR TODOS (CORRIGIDO FINAL)
 # ====================================
 
