@@ -289,16 +289,24 @@ if clientes:
                 st.rerun()
 
 # ====================================
-# COBRAR TODOS (CORRIGIDO E FUNCIONAL)
+# COBRAR TODOS (CORRIGIDO FINAL)
 # ====================================
 
 st.divider()
 
 st.subheader("📣 Cobrança em Massa")
 
+def mensagem_cobranca(nome):
+    return (
+        f"Olá {nome} 👋\n\n"
+        f"Identificamos que seu acesso está pendente.\n"
+        f"Solicitamos a regularização para evitar bloqueio.\n\n"
+        f"Qualquer dúvida, estamos à disposição."
+    )
+
 if clientes:
 
-    if st.button("📲 Gerar Cobrança em Massa"):
+    if st.button("📲 Gerar Lista de Cobrança"):
 
         inadimplentes = []
 
@@ -315,42 +323,59 @@ if clientes:
             except:
                 continue
 
-        if not inadimplentes:
-            st.success("Nenhum cliente pendente 👍")
-
-        else:
-            st.warning(f"{len(inadimplentes)} clientes para cobrança")
-
-            st.session_state["lista_cobranca"] = inadimplentes
+        st.session_state["cobranca"] = inadimplentes
 
 # ====================================
-# LISTA DE COBRANÇA GERADA
+# LISTA GERADA
 # ====================================
 
-if "lista_cobranca" in st.session_state:
+if "cobranca" in st.session_state:
 
-    st.markdown("### 📲 Lista de cobrança gerada")
+    lista = st.session_state["cobranca"]
 
-    for c in st.session_state["lista_cobranca"]:
+    st.success(f"{len(lista)} clientes na fila de cobrança")
+
+    col1, col2 = st.columns(2)
+
+    # BOTÃO NOVO: ABRIR EM MASSA (SEQUENCIAL)
+    with col1:
+
+        if st.button("🚀 Abrir cobranças em sequência"):
+
+            for c in lista:
+
+                whatsapp = str(c.get("whatsapp", "")).replace("+", "").replace(" ", "")
+
+                if whatsapp:
+
+                    msg = mensagem_cobranca(c["nome"])
+
+                    st.markdown(
+                        f"👉 https://wa.me/55{whatsapp}?text={msg}"
+                    )
+
+    # LIMPAR LISTA
+    with col2:
+
+        if st.button("🧹 Limpar Lista"):
+            del st.session_state["cobranca"]
+            st.rerun()
+
+    st.divider()
+
+    # BOTÕES INDIVIDUAIS (FALLBACK)
+    for c in lista:
 
         whatsapp = str(c.get("whatsapp", "")).replace("+", "").replace(" ", "")
 
-        mensagem = (
-            f"Olá {c['nome']} 👋\n\n"
-            f"Identificamos que seu acesso está pendente.\n"
-            f"Solicitamos a regularização para evitar bloqueio.\n\n"
-            f"Qualquer dúvida, estamos à disposição."
-        )
-
         if whatsapp:
+
+            msg = mensagem_cobranca(c["nome"])
 
             st.link_button(
                 f"📲 Cobrar {c['nome']}",
-                f"https://wa.me/55{whatsapp}?text={mensagem}"
+                f"https://wa.me/55{whatsapp}?text={msg}"
             )
-
-    if st.button("🧹 Limpar Lista de Cobrança"):
-        del st.session_state["lista_cobranca"]
         st.rerun()
 
 # ====================================
