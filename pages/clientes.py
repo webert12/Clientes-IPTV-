@@ -180,7 +180,8 @@ for i, c in enumerate(clientes):
         "Telas": c.get("telas", 1),
         "Vencimento": c["vencimento"],
         "Status": situacao,
-        "Pagamento": pagamento
+        "Pagamento": pagamento,
+        "Ação": i   # 👈 NOVO
     })
 
 
@@ -192,45 +193,39 @@ st.subheader("📋 Lista de Clientes")
 
 if dados:
 
-    for row in dados:
-        col1, col2, col3, col4, col5, col6 = st.columns([2, 2, 2, 2, 2, 1])
+    df = pd.DataFrame(dados)
 
-        with col1:
-            st.write(row["Nome"])
+    for i, row in df.iterrows():
 
-        with col2:
-            st.write(row["WhatsApp"])
+        col1, col2, col3, col4, col5, col6, col7, col8 = st.columns(8)
 
-        with col3:
-            st.write(row["Valor"])
+        col1.write(row["Nome"])
+        col2.write(row["WhatsApp"])
+        col3.write(row["Usuário IPTV"])
+        col4.write(row["Valor"])
+        col5.write(row["Telas"])
+        col6.write(row["Vencimento"])
+        col7.write(row["Pagamento"])
 
-        with col4:
-            st.write(row["Telas"])
+        cli = clientes[row["ID"]]
 
-        with col5:
-            st.write(row["Pagamento"])
+        if col8.button("✔️ Confirmar", key=f"pay_{row['ID']}"):
+            cli["status"] = "Recebido"
 
-        with col6:
-            if st.button("✔️ Confirmar", key=f"conf_{row['ID']}"):
+            hoje = datetime.now()
+            ano = hoje.year
+            mes = hoje.month
 
-                clientes[row["ID"]]["status"] = "Recebido"
+            if hoje.day > 10:
+                mes += 1
+                if mes > 12:
+                    mes = 1
+                    ano += 1
 
-                hoje = datetime.now()
-                ano = hoje.year
-                mes = hoje.month
+            cli["vencimento"] = datetime(ano, mes, 10).strftime("%d/%m/%Y")
 
-                if hoje.day > 10:
-                    mes += 1
-                    if mes > 12:
-                        mes = 1
-                        ano += 1
-
-                clientes[row["ID"]]["vencimento"] = datetime(ano, mes, 10).strftime("%d/%m/%Y")
-
-                ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
-
-                st.success(f"{row['Nome']} confirmado!")
-                st.rerun()
+            ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
+            st.rerun()
 
 else:
     st.warning("Nenhum cliente encontrado.")
@@ -324,7 +319,7 @@ if st.session_state["show_delete"]:
 
 
 # =========================
-# EDIÇÃO
+# EDIÇÃO (COM VALOR GARANTIDO ATUALIZADO)
 # =========================
 
 st.divider()
@@ -360,5 +355,6 @@ if clientes:
     if st.button("Salvar"):
 
         ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
+
         st.success("Atualizado")
         st.rerun()
