@@ -15,15 +15,12 @@ if not ARQ.exists():
 clientes = json.loads(ARQ.read_text(encoding="utf-8"))
 
 # ====================================
-# IMPORTAÇÃO EM MASSA INTELIGENTE
+# IMPORTAÇÃO EM MASSA INTELIGENTE (FIX)
 # ====================================
 
 with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
 
-    texto = st.text_area(
-        "Cole usuários / senhas / nomes (qualquer formato)",
-        height=300
-    )
+    texto = st.text_area("Cole usuários / senhas / nomes (qualquer formato)", height=300)
 
     valor_padrao = st.number_input("Valor Mensal", value=25.0, step=1.0)
 
@@ -38,9 +35,7 @@ with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
         ano = hoje.year
         mes = hoje.month
 
-        # ============================
-        # REGRA: VENCIMENTO DIA 10
-        # ============================
+        # vencimento fixo dia 10
         if hoje.day > 10:
             mes += 1
 
@@ -53,6 +48,58 @@ with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
         for linha in linhas:
 
             partes = linha.split()
+
+            if len(partes) >= 3:
+
+                a, b, c = partes[0], partes[1], " ".join(partes[2:])
+
+                if any(char.isdigit() for char in a):
+                    usuario = a
+                    senha = b
+                    nome = c
+                else:
+                    nome = a
+                    usuario = b
+                    senha = c
+
+            elif len(partes) == 2:
+
+                usuario = partes[0]
+                senha = partes[1]
+                nome = partes[0]
+
+            else:
+                continue
+
+            clientes_novos.append({
+                "nome": nome,
+                "whatsapp": "",
+                "usuario": usuario,
+                "senha": senha,
+                "valor": valor_padrao,
+                "observacao": "",
+                "vencimento": vencimento_fixo,
+                "status": "Pendente"
+            })
+
+            tabela_preview.append({
+                "Nome": nome,
+                "Usuário": usuario,
+                "Senha": senha,
+                "Vencimento": vencimento_fixo
+            })
+
+        clientes.extend(clientes_novos)
+
+        ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
+
+        st.success(f"{len(clientes_novos)} clientes importados!")
+
+        if tabela_preview:
+            st.subheader("📋 Pré-visualização")
+            st.dataframe(pd.DataFrame(tabela_preview), use_container_width=True, hide_index=True)
+
+        st.rerun()
 
             # =========================
             # 3 CAMPOS
