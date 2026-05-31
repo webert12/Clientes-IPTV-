@@ -19,13 +19,8 @@ clientes = json.loads(ARQ.read_text(encoding="utf-8"))
 # =========================
 
 with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
-with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
 
-    texto = st.text_area(
-        "Cole usuários / senhas / nomes (qualquer formato)",
-        height=300
-    )
-
+    texto = st.text_area("Cole usuários / senhas / nomes", height=300)
     valor_padrao = st.number_input("Valor Mensal", value=25.0, step=1.0)
 
     if st.button("Processar Importação"):
@@ -65,8 +60,9 @@ with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
                 continue
 
             # =========================
-            # VENCIMENTO DIA 10 CORRIGIDO
+            # VENCIMENTO CORRIGIDO (DIA 10 INTELIGENTE)
             # =========================
+
             ano = hoje.year
             mes = hoje.month
 
@@ -109,6 +105,7 @@ with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
             st.dataframe(pd.DataFrame(tabela_preview), use_container_width=True, hide_index=True)
 
         st.rerun()
+
 # =========================
 # STATUS COLORIDO
 # =========================
@@ -198,7 +195,7 @@ else:
     st.warning("Nenhum cliente encontrado.")
 
 # =========================
-# COBRANÇA EM MASSA (WHATSAPP LIMPO)
+# COBRANÇA EM MASSA
 # =========================
 
 st.divider()
@@ -271,7 +268,6 @@ if selecionados:
                 clientes.remove(c)
 
         ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
-
         st.success("Excluídos com sucesso")
         st.rerun()
 
@@ -316,7 +312,18 @@ if clientes:
     if st.button("💵 Receber pagamento"):
 
         cli["status"] = "Recebido"
-        cli["vencimento"] = datetime(datetime.now().year, datetime.now().month, 10).strftime("%d/%m/%Y")
+
+        hoje = datetime.now()
+        ano = hoje.year
+        mes = hoje.month
+
+        if hoje.day > 10:
+            mes += 1
+            if mes > 12:
+                mes = 1
+                ano += 1
+
+        cli["vencimento"] = datetime(ano, mes, 10).strftime("%d/%m/%Y")
 
         ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
 
