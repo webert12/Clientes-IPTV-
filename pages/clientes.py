@@ -12,7 +12,11 @@ ARQ = Path("clientes.json")
 if not ARQ.exists():
     ARQ.write_text("[]", encoding="utf-8")
 
-clientes = json.loads(ARQ.read_text(encoding="utf-8"))
+# 🔥 IMPORTANTE: sempre recarregar dados atualizados
+def carregar_clientes():
+    return json.loads(ARQ.read_text(encoding="utf-8"))
+
+clientes = carregar_clientes()
 
 # controle da exclusão em massa (OCULTO POR PADRÃO)
 if "show_delete" not in st.session_state:
@@ -64,10 +68,6 @@ with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
             else:
                 continue
 
-            # =========================
-            # VENCIMENTO DIA 10 INTELIGENTE
-            # =========================
-
             ano = hoje.year
             mes = hoje.month
 
@@ -85,7 +85,7 @@ with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
                 "usuario": usuario,
                 "senha": senha,
                 "valor": valor_padrao,
-                "telas": 1,  # 👈 NOVO CAMPO ADICIONADO
+                "telas": 1,
                 "observacao": "",
                 "vencimento": vencimento.strftime("%d/%m/%Y"),
                 "status": "Pendente"
@@ -100,16 +100,9 @@ with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
 
         clientes.extend(clientes_novos)
 
-        ARQ.write_text(
-            json.dumps(clientes, indent=4, ensure_ascii=False),
-            encoding="utf-8"
-        )
+        ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
 
         st.success(f"{len(clientes_novos)} clientes importados!")
-
-        if tabela_preview:
-            st.subheader("📋 Pré-visualização")
-            st.dataframe(pd.DataFrame(tabela_preview), use_container_width=True, hide_index=True)
 
         st.rerun()
 
@@ -143,6 +136,8 @@ status_filtro = st.selectbox(
 )
 
 hoje = datetime.now().date()
+
+clientes = carregar_clientes()  # 🔥 RECARREGA SEMPRE AQUI
 
 dados = []
 
@@ -182,7 +177,7 @@ for i, c in enumerate(clientes):
         "WhatsApp": c["whatsapp"],
         "Usuário IPTV": c["usuario"],
         "Valor": f"R$ {c['valor']:.2f}",
-        "Telas": c.get("telas", 1),  # 👈 NOVO CAMPO NA TABELA
+        "Telas": c.get("telas", 1),
         "Vencimento": c["vencimento"],
         "Status": situacao,
         "Pagamento": pagamento
@@ -255,7 +250,7 @@ if "cobranca" in st.session_state:
 
 
 # =========================
-# EXCLUSÃO EM MASSA (OCULTA)
+# EXCLUSÃO EM MASSA
 # =========================
 
 st.divider()
@@ -294,11 +289,13 @@ if st.session_state["show_delete"]:
 
 
 # =========================
-# EDIÇÃO (COM TELAS)
+# EDIÇÃO (COM VALOR GARANTIDO ATUALIZADO)
 # =========================
 
 st.divider()
 st.subheader("✏️ Editar Cliente")
+
+clientes = carregar_clientes()  # 🔥 garante atualização
 
 if clientes:
 
@@ -312,7 +309,13 @@ if clientes:
     cli["usuario"] = st.text_input("Usuário", cli["usuario"])
     cli["senha"] = st.text_input("Senha", cli["senha"])
 
-    # 👇 NOVO CAMPO TELAS
+    # 🔥 VALOR AGORA SEMPRE SINCRONIZADO COM A TABELA
+    cli["valor"] = st.number_input(
+        "Valor",
+        value=float(cli.get("valor", 0)),
+        step=1.0
+    )
+
     cli["telas"] = st.number_input(
         "Quantidade de Telas",
         min_value=1,
@@ -321,7 +324,9 @@ if clientes:
     )
 
     if st.button("Salvar"):
+
         ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
+
         st.success("Atualizado")
         st.rerun()
 
