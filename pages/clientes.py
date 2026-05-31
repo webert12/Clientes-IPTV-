@@ -3,7 +3,6 @@ import json
 import pandas as pd
 from pathlib import Path
 from datetime import datetime
-from calendar import monthrange
 
 st.title("👥 Gestão de Clientes")
 
@@ -12,9 +11,18 @@ ARQ = Path("clientes.json")
 if not ARQ.exists():
     ARQ.write_text("[]", encoding="utf-8")
 
-# 🔥 IMPORTANTE: sempre recarregar dados atualizados
+
+# 🔥 FUNÇÃO PARA CARREGAR SEMPRE ATUALIZADO
 def carregar_clientes():
     return json.loads(ARQ.read_text(encoding="utf-8"))
+
+
+def salvar_clientes(clientes):
+    ARQ.write_text(
+        json.dumps(clientes, indent=4, ensure_ascii=False),
+        encoding="utf-8"
+    )
+
 
 clientes = carregar_clientes()
 
@@ -26,7 +34,6 @@ if "show_delete" not in st.session_state:
 # =========================
 # IMPORTAÇÃO EM MASSA
 # =========================
-
 with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
 
     texto = st.text_area("Cole usuários / senhas / nomes", height=300)
@@ -99,18 +106,15 @@ with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
             })
 
         clientes.extend(clientes_novos)
-
-        ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
+        salvar_clientes(clientes)
 
         st.success(f"{len(clientes_novos)} clientes importados!")
-
         st.rerun()
 
 
 # =========================
-# STATUS COLORIDO
+# STATUS
 # =========================
-
 def color_status(row):
 
     if "💰" in str(row["Pagamento"]):
@@ -125,7 +129,6 @@ def color_status(row):
 # =========================
 # FILTRO
 # =========================
-
 st.subheader("🔍 Pesquisa")
 
 pesquisa = st.text_input("Pesquisar cliente")
@@ -137,10 +140,13 @@ status_filtro = st.selectbox(
 
 hoje = datetime.now().date()
 
-clientes = carregar_clientes()  # 🔥 RECARREGA SEMPRE AQUI
+clientes = carregar_clientes()
 
 dados = []
 
+# =========================
+# CONSTRUÇÃO DOS DADOS
+# =========================
 for i, c in enumerate(clientes):
 
     try:
@@ -176,7 +182,7 @@ for i, c in enumerate(clientes):
         "Nome": c["nome"],
         "WhatsApp": c["whatsapp"],
         "Usuário IPTV": c["usuario"],
-        "Valor": f"R$ {c['valor']:.2f}",
+        "Valor": f"R$ {c.get('valor',0):.2f}",
         "Telas": c.get("telas", 1),
         "Vencimento": c["vencimento"],
         "Status": situacao,
@@ -185,183 +191,56 @@ for i, c in enumerate(clientes):
 
 
 # =========================
-# TABELA
+# LISTA COM BOTÃO DE CONFIRMAR
 # =========================
-
 st.subheader("📋 Lista de Clientes")
 
 if dados:
 
-    df = pd.DataFrame(dados)
-    styled = df.style.apply(color_status, axis=1)
+    for row in dados:
 
-    st.dataframe(styled, use_container_width=True, hide_index=True)
+        i = row["ID"]
+
+        col1, col2, col3, col4, col5, col6, col7 = st.columns([2,2,2,2,2,2,1])
+
+        with col1:
+            st.write(row["Nome"])
+
+        with col2:
+            st.write(row["WhatsApp"])
+
+        with col3:
+            st.write(row["Usuário IPTV"])
+
+        with col4:
+            st.write(row["Valor"])
+
+        with col5:
+            st.write(row["Telas"])
+
+        with col6:
+            st.write(row["Pagamento"])
+
+        with col7:
+            if st.button("✔", key=f"pay_{i}"):
+
+                clientes[i]["status"] = "Recebido"
+
+                hoje = datetime.now()
+                ano = hoje.year
+                mes = hoje.month
+
+                if hoje.day > 10:
+                    mes += 1
+                    if mes > 12:
+                        mes = 1
+                        ano += 1
+
+                clientes[i]["vencimento"] = datetime(ano, mes, 10).strftime("%d/%m/%Y")
+
+                salvar_clientes(clientes)
+                st.success(f"{row['Nome']} confirmado!")
+                st.rerun()
 
 else:
     st.warning("Nenhum cliente encontrado.")
-
-
-# =========================
-# COBRANÇA EM MASSA
-# =========================
-
-st.divider()
-st.subheader("📣 Cobrança em Massa")
-
-def msg(nome):
-    return f"Olá {nome} 👋\n\nSeu acesso está pendente.\nRegularize por favor."
-
-if clientes:
-
-    if st.button("📲 Gerar Cobranças"):
-
-        lista = []
-
-        for c in clientes:
-            try:
-                venc = datetime.strptime(c["vencimento"], "%d/%m/%Y").date()
-                if venc < hoje or c["status"] == "Pendente":
-                    lista.append(c)
-            except:
-                pass
-
-        st.session_state["cobranca"] = lista
-
-
-if "cobranca" in st.session_state:
-
-    lista = st.session_state["cobranca"]
-
-    st.success(f"{len(lista)} clientes na cobrança")
-
-    for c in lista:
-
-        whatsapp = str(c.get("whatsapp", "")).replace("+", "").replace(" ", "")
-
-        if whatsapp:
-            st.link_button(
-                f"📲 Cobrar {c['nome']}",
-                f"https://wa.me/55{whatsapp}?text={msg(c['nome'])}"
-            )
-
-    if st.button("🧹 Limpar Lista"):
-        del st.session_state["cobranca"]
-        st.rerun()
-
-
-# =========================
-# EXCLUSÃO EM MASSA
-# =========================
-
-st.divider()
-st.subheader("🗑️ Exclusão em Massa")
-
-if st.button("⚙️ Abrir / Fechar Exclusão em Massa"):
-    st.session_state["show_delete"] = not st.session_state["show_delete"]
-
-if st.session_state["show_delete"]:
-
-    st.warning("Modo de exclusão ativado")
-
-    selecionados = []
-
-    for i, c in enumerate(clientes):
-        col1, col2 = st.columns([0.1, 0.9])
-
-        with col1:
-            if st.checkbox("", key=f"del_{i}"):
-                selecionados.append(c)
-
-        with col2:
-            st.write(f"{c['nome']} | {c.get('whatsapp','')} | Telas: {c.get('telas',1)}")
-
-    if selecionados:
-
-        if st.button("🗑️ Excluir selecionados"):
-
-            for c in selecionados:
-                if c in clientes:
-                    clientes.remove(c)
-
-            ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
-            st.success("Excluídos com sucesso")
-            st.rerun()
-
-
-# =========================
-# EDIÇÃO (COM VALOR GARANTIDO ATUALIZADO)
-# =========================
-
-st.divider()
-st.subheader("✏️ Editar Cliente")
-
-clientes = carregar_clientes()  # 🔥 garante atualização
-
-if clientes:
-
-    nomes = [c["nome"] for c in clientes]
-    sel = st.selectbox("Cliente", nomes)
-
-    cli = next(c for c in clientes if c["nome"] == sel)
-
-    cli["nome"] = st.text_input("Nome", cli["nome"])
-    cli["whatsapp"] = st.text_input("WhatsApp", cli["whatsapp"])
-    cli["usuario"] = st.text_input("Usuário", cli["usuario"])
-    cli["senha"] = st.text_input("Senha", cli["senha"])
-
-    # 🔥 VALOR AGORA SEMPRE SINCRONIZADO COM A TABELA
-    cli["valor"] = st.number_input(
-        "Valor",
-        value=float(cli.get("valor", 0)),
-        step=1.0
-    )
-
-    cli["telas"] = st.number_input(
-        "Quantidade de Telas",
-        min_value=1,
-        value=int(cli.get("telas", 1)),
-        step=1
-    )
-
-    if st.button("Salvar"):
-
-        ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
-
-        st.success("Atualizado")
-        st.rerun()
-
-
-# =========================
-# RECEBER PAGAMENTO
-# =========================
-
-st.divider()
-st.subheader("⚙️ Ações")
-
-if clientes:
-
-    nomes = [c["nome"] for c in clientes]
-    sel = st.selectbox("Cliente ação", nomes)
-
-    cli = next(c for c in clientes if c["nome"] == sel)
-
-    if st.button("💵 Receber pagamento"):
-
-        cli["status"] = "Recebido"
-
-        hoje = datetime.now()
-        ano = hoje.year
-        mes = hoje.month
-
-        if hoje.day > 10:
-            mes += 1
-            if mes > 12:
-                mes = 1
-                ano += 1
-
-        cli["vencimento"] = datetime(ano, mes, 10).strftime("%d/%m/%Y")
-
-        ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
-
-        st.success("Pagamento confirmado")
-        st.rerun()
