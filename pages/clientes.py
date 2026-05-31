@@ -190,7 +190,6 @@ if dados:
 
 else:
     st.warning("Nenhum cliente encontrado.")
-    st.rerun()
 # ====================================
 # EDIÇÃO
 # ====================================
