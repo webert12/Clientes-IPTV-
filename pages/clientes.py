@@ -3,7 +3,6 @@ import json
 import pandas as pd
 from pathlib import Path
 from datetime import datetime
-from calendar import monthrange
 
 st.title("👥 Gestão de Clientes")
 
@@ -29,8 +28,6 @@ with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
 
         clientes_novos = []
         tabela_preview = []
-
-        hoje = datetime.now()
 
         for linha in linhas:
 
@@ -60,17 +57,20 @@ with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
                 continue
 
             # =========================
-            # VENCIMENTO CORRIGIDO (DIA 10 INTELIGENTE)
+            # VENCIMENTO DIA 10 (AJUSTE CORRETO)
             # =========================
 
-            ano = hoje.year
-            mes = hoje.month
+            hoje = datetime.now()
 
             if hoje.day > 10:
-                mes += 1
+                mes = hoje.month + 1
+                ano = hoje.year
                 if mes > 12:
                     mes = 1
                     ano += 1
+            else:
+                mes = hoje.month
+                ano = hoje.year
 
             vencimento = datetime(ano, mes, 10)
 
@@ -93,10 +93,7 @@ with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
 
         clientes.extend(clientes_novos)
 
-        ARQ.write_text(
-            json.dumps(clientes, indent=4, ensure_ascii=False),
-            encoding="utf-8"
-        )
+        ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
 
         st.success(f"{len(clientes_novos)} clientes importados!")
 
@@ -107,31 +104,12 @@ with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
         st.rerun()
 
 # =========================
-# STATUS COLORIDO
-# =========================
-
-def color_status(row):
-
-    if "💰" in str(row["Pagamento"]):
-        return ["background-color: #2ecc71; color: white;"] * len(row)
-
-    if "Pendente" in str(row["Pagamento"]):
-        return ["background-color: #f1c40f; color: black;"] * len(row)
-
-    return [""] * len(row)
-
-# =========================
-# FILTRO
+# FILTRO / LISTA
 # =========================
 
 st.subheader("🔍 Pesquisa")
 
 pesquisa = st.text_input("Pesquisar cliente")
-
-status_filtro = st.selectbox(
-    "Filtrar",
-    ["Todos", "Em Dia", "Vencendo", "Vencido", "Recebido", "Pendente"]
-)
 
 hoje = datetime.now().date()
 
@@ -157,14 +135,6 @@ for i, c in enumerate(clientes):
     if pesquisa.lower() not in texto:
         continue
 
-    if status_filtro != "Todos":
-        if status_filtro in ["Em Dia", "Vencendo", "Vencido"]:
-            if situacao != status_filtro:
-                continue
-        else:
-            if c["status"] != status_filtro:
-                continue
-
     pagamento = "💰 Recebido" if c["status"] == "Recebido" else "⏳ Pendente"
 
     dados.append({
@@ -178,24 +148,16 @@ for i, c in enumerate(clientes):
         "Pagamento": pagamento
     })
 
-# =========================
-# TABELA
-# =========================
-
 st.subheader("📋 Lista de Clientes")
 
 if dados:
-
     df = pd.DataFrame(dados)
-    styled = df.style.apply(color_status, axis=1)
-
-    st.dataframe(styled, use_container_width=True, hide_index=True)
-
+    st.dataframe(df, use_container_width=True, hide_index=True)
 else:
     st.warning("Nenhum cliente encontrado.")
 
 # =========================
-# COBRANÇA EM MASSA
+# COBRANÇA
 # =========================
 
 st.divider()
@@ -204,21 +166,19 @@ st.subheader("📣 Cobrança em Massa")
 def msg(nome):
     return f"Olá {nome} 👋\n\nSeu acesso está pendente.\nRegularize por favor."
 
-if clientes:
+if st.button("📲 Gerar Cobranças"):
 
-    if st.button("📲 Gerar Cobranças"):
+    lista = []
 
-        lista = []
+    for c in clientes:
+        try:
+            venc = datetime.strptime(c["vencimento"], "%d/%m/%Y").date()
+            if venc < hoje or c["status"] == "Pendente":
+                lista.append(c)
+        except:
+            pass
 
-        for c in clientes:
-            try:
-                venc = datetime.strptime(c["vencimento"], "%d/%m/%Y").date()
-                if venc < hoje or c["status"] == "Pendente":
-                    lista.append(c)
-            except:
-                pass
-
-        st.session_state["cobranca"] = lista
+    st.session_state["cobranca"] = lista
 
 if "cobranca" in st.session_state:
 
@@ -227,7 +187,6 @@ if "cobranca" in st.session_state:
     st.success(f"{len(lista)} clientes na cobrança")
 
     for c in lista:
-
         whatsapp = str(c.get("whatsapp", "")).replace("+", "").replace(" ", "")
 
         if whatsapp:
@@ -241,35 +200,36 @@ if "cobranca" in st.session_state:
         st.rerun()
 
 # =========================
-# EXCLUSÃO EM MASSA
+# 🔒 EXCLUSÃO EM MASSA (OCULTO)
 # =========================
 
-st.divider()
-st.subheader("🗑️ Exclusão em Massa")
+with st.expander("🗑️ Exclusão em Massa de Clientes (Clique para abrir)"):
 
-selecionados = []
+    selecionados = []
 
-for i, c in enumerate(clientes):
-    col1, col2 = st.columns([0.1, 0.9])
+    for i, c in enumerate(clientes):
 
-    with col1:
-        if st.checkbox("", key=f"del_{i}"):
-            selecionados.append(c)
+        col1, col2 = st.columns([0.1, 0.9])
 
-    with col2:
-        st.write(f"{c['nome']} | {c.get('whatsapp','')}")
+        with col1:
+            if st.checkbox("", key=f"del_{i}"):
+                selecionados.append(c)
 
-if selecionados:
+        with col2:
+            st.write(f"{c['nome']} | {c.get('whatsapp','')}")
 
-    if st.button("🗑️ Excluir selecionados"):
+    if selecionados:
 
-        for c in selecionados:
-            if c in clientes:
-                clientes.remove(c)
+        if st.button("🗑️ Excluir selecionados"):
 
-        ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
-        st.success("Excluídos com sucesso")
-        st.rerun()
+            for c in selecionados:
+                if c in clientes:
+                    clientes.remove(c)
+
+            ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
+
+            st.success("Excluídos com sucesso")
+            st.rerun()
 
 # =========================
 # EDIÇÃO
@@ -312,18 +272,7 @@ if clientes:
     if st.button("💵 Receber pagamento"):
 
         cli["status"] = "Recebido"
-
-        hoje = datetime.now()
-        ano = hoje.year
-        mes = hoje.month
-
-        if hoje.day > 10:
-            mes += 1
-            if mes > 12:
-                mes = 1
-                ano += 1
-
-        cli["vencimento"] = datetime(ano, mes, 10).strftime("%d/%m/%Y")
+        cli["vencimento"] = datetime(datetime.now().year, datetime.now().month, 10).strftime("%d/%m/%Y")
 
         ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
 
