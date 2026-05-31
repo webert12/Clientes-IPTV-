@@ -14,7 +14,7 @@ if not ARQ.exists():
 clientes = json.loads(ARQ.read_text(encoding="utf-8"))
 
 # =========================
-# IMPORTAÇÃO EM MASSA
+# IMPORTAÇÃO EM MASSA (INTELIGENTE + VENCIMENTO DIA 10 CORRIGIDO)
 # =========================
 
 with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
@@ -57,9 +57,8 @@ with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
                 continue
 
             # =========================
-            # VENCIMENTO DIA 10 (AJUSTE CORRETO)
+            # VENCIMENTO DIA 10 (REGRA CORRETA)
             # =========================
-
             hoje = datetime.now()
 
             if hoje.day > 10:
@@ -104,7 +103,7 @@ with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
         st.rerun()
 
 # =========================
-# FILTRO / LISTA
+# PESQUISA + FILTRO + STATUS
 # =========================
 
 st.subheader("🔍 Pesquisa")
@@ -157,7 +156,7 @@ else:
     st.warning("Nenhum cliente encontrado.")
 
 # =========================
-# COBRANÇA
+# COBRANÇA EM MASSA (RESTAURADO COMPLETO)
 # =========================
 
 st.divider()
@@ -187,6 +186,7 @@ if "cobranca" in st.session_state:
     st.success(f"{len(lista)} clientes na cobrança")
 
     for c in lista:
+
         whatsapp = str(c.get("whatsapp", "")).replace("+", "").replace(" ", "")
 
         if whatsapp:
@@ -200,10 +200,10 @@ if "cobranca" in st.session_state:
         st.rerun()
 
 # =========================
-# 🔒 EXCLUSÃO EM MASSA (OCULTO)
+# 🔒 EXCLUSÃO EM MASSA (OCULTA RESTAURADA)
 # =========================
 
-with st.expander("🗑️ Exclusão em Massa de Clientes (Clique para abrir)"):
+with st.expander("🗑️ Exclusão em Massa de Clientes"):
 
     selecionados = []
 
@@ -232,7 +232,7 @@ with st.expander("🗑️ Exclusão em Massa de Clientes (Clique para abrir)"):
             st.rerun()
 
 # =========================
-# EDIÇÃO
+# EDIÇÃO (RESTAURADA)
 # =========================
 
 st.divider()
@@ -256,7 +256,7 @@ if clientes:
         st.rerun()
 
 # =========================
-# RECEBER PAGAMENTO
+# RECEBER PAGAMENTO (RESTAURADO)
 # =========================
 
 st.divider()
