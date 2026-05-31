@@ -85,6 +85,7 @@ with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
                 "usuario": usuario,
                 "senha": senha,
                 "valor": valor_padrao,
+                "telas": 1,  # 👈 NOVO CAMPO ADICIONADO
                 "observacao": "",
                 "vencimento": vencimento.strftime("%d/%m/%Y"),
                 "status": "Pendente"
@@ -93,7 +94,8 @@ with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
             tabela_preview.append({
                 "Nome": nome,
                 "Usuário": usuario,
-                "Senha": senha
+                "Senha": senha,
+                "Telas": 1
             })
 
         clientes.extend(clientes_novos)
@@ -180,6 +182,7 @@ for i, c in enumerate(clientes):
         "WhatsApp": c["whatsapp"],
         "Usuário IPTV": c["usuario"],
         "Valor": f"R$ {c['valor']:.2f}",
+        "Telas": c.get("telas", 1),  # 👈 NOVO CAMPO NA TABELA
         "Vencimento": c["vencimento"],
         "Status": situacao,
         "Pagamento": pagamento
@@ -275,7 +278,7 @@ if st.session_state["show_delete"]:
                 selecionados.append(c)
 
         with col2:
-            st.write(f"{c['nome']} | {c.get('whatsapp','')}")
+            st.write(f"{c['nome']} | {c.get('whatsapp','')} | Telas: {c.get('telas',1)}")
 
     if selecionados:
 
@@ -291,7 +294,7 @@ if st.session_state["show_delete"]:
 
 
 # =========================
-# EDIÇÃO
+# EDIÇÃO (COM TELAS)
 # =========================
 
 st.divider()
@@ -308,6 +311,14 @@ if clientes:
     cli["whatsapp"] = st.text_input("WhatsApp", cli["whatsapp"])
     cli["usuario"] = st.text_input("Usuário", cli["usuario"])
     cli["senha"] = st.text_input("Senha", cli["senha"])
+
+    # 👇 NOVO CAMPO TELAS
+    cli["telas"] = st.number_input(
+        "Quantidade de Telas",
+        min_value=1,
+        value=int(cli.get("telas", 1)),
+        step=1
+    )
 
     if st.button("Salvar"):
         ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
