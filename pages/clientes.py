@@ -16,10 +16,6 @@ if not ARQ.exists():
 def carregar_clientes():
     return json.loads(ARQ.read_text(encoding="utf-8"))
 
-def salvar_clientes(clientes):
-    ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
-
-
 clientes = carregar_clientes()
 
 # controle da exclusão em massa (OCULTO POR PADRÃO)
@@ -30,6 +26,7 @@ if "show_delete" not in st.session_state:
 # =========================
 # IMPORTAÇÃO EM MASSA
 # =========================
+
 with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
 
     texto = st.text_area("Cole usuários / senhas / nomes", height=300)
@@ -102,15 +99,18 @@ with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
             })
 
         clientes.extend(clientes_novos)
-        salvar_clientes(clientes)
+
+        ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
 
         st.success(f"{len(clientes_novos)} clientes importados!")
+
         st.rerun()
 
 
 # =========================
 # STATUS COLORIDO
 # =========================
+
 def color_status(row):
 
     if "💰" in str(row["Pagamento"]):
@@ -125,6 +125,7 @@ def color_status(row):
 # =========================
 # FILTRO
 # =========================
+
 st.subheader("🔍 Pesquisa")
 
 pesquisa = st.text_input("Pesquisar cliente")
@@ -186,15 +187,13 @@ for i, c in enumerate(clientes):
 # =========================
 # TABELA (COM BOTÃO CONFIRMAR)
 # =========================
+
 st.subheader("📋 Lista de Clientes")
 
 if dados:
 
     for row in dados:
-
-        i = row["ID"]
-
-        col1, col2, col3, col4, col5, col6, col7 = st.columns([2,2,2,2,2,2,1])
+        col1, col2, col3, col4, col5, col6 = st.columns([2, 2, 2, 2, 2, 1])
 
         with col1:
             st.write(row["Nome"])
@@ -203,21 +202,18 @@ if dados:
             st.write(row["WhatsApp"])
 
         with col3:
-            st.write(row["Usuário IPTV"])
-
-        with col4:
             st.write(row["Valor"])
 
-        with col5:
+        with col4:
             st.write(row["Telas"])
 
-        with col6:
+        with col5:
             st.write(row["Pagamento"])
 
-        with col7:
-            if st.button("✔", key=f"pay_{i}"):
+        with col6:
+            if st.button("✔️ Confirmar", key=f"conf_{row['ID']}"):
 
-                clientes[i]["status"] = "Recebido"
+                clientes[row["ID"]]["status"] = "Recebido"
 
                 hoje = datetime.now()
                 ano = hoje.year
@@ -229,9 +225,9 @@ if dados:
                         mes = 1
                         ano += 1
 
-                clientes[i]["vencimento"] = datetime(ano, mes, 10).strftime("%d/%m/%Y")
+                clientes[row["ID"]]["vencimento"] = datetime(ano, mes, 10).strftime("%d/%m/%Y")
 
-                salvar_clientes(clientes)
+                ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
 
                 st.success(f"{row['Nome']} confirmado!")
                 st.rerun()
@@ -243,6 +239,7 @@ else:
 # =========================
 # COBRANÇA EM MASSA
 # =========================
+
 st.divider()
 st.subheader("📣 Cobrança em Massa")
 
@@ -290,6 +287,7 @@ if "cobranca" in st.session_state:
 # =========================
 # EXCLUSÃO EM MASSA
 # =========================
+
 st.divider()
 st.subheader("🗑️ Exclusão em Massa")
 
@@ -320,7 +318,7 @@ if st.session_state["show_delete"]:
                 if c in clientes:
                     clientes.remove(c)
 
-            salvar_clientes(clientes)
+            ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
             st.success("Excluídos com sucesso")
             st.rerun()
 
@@ -328,6 +326,7 @@ if st.session_state["show_delete"]:
 # =========================
 # EDIÇÃO
 # =========================
+
 st.divider()
 st.subheader("✏️ Editar Cliente")
 
@@ -344,10 +343,22 @@ if clientes:
     cli["whatsapp"] = st.text_input("WhatsApp", cli["whatsapp"])
     cli["usuario"] = st.text_input("Usuário", cli["usuario"])
     cli["senha"] = st.text_input("Senha", cli["senha"])
-    cli["valor"] = st.number_input("Valor", value=float(cli.get("valor", 0)), step=1.0)
-    cli["telas"] = st.number_input("Quantidade de Telas", min_value=1, value=int(cli.get("telas", 1)), step=1)
+
+    cli["valor"] = st.number_input(
+        "Valor",
+        value=float(cli.get("valor", 0)),
+        step=1.0
+    )
+
+    cli["telas"] = st.number_input(
+        "Quantidade de Telas",
+        min_value=1,
+        value=int(cli.get("telas", 1)),
+        step=1
+    )
 
     if st.button("Salvar"):
-        salvar_clientes(clientes)
+
+        ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
         st.success("Atualizado")
         st.rerun()
