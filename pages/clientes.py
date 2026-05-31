@@ -15,21 +15,20 @@ if not ARQ.exists():
 clientes = json.loads(ARQ.read_text(encoding="utf-8"))
 
 # ====================================
-# IMPORTAÇÃO EM MASSA INTELIGENTE (FIX)
+# IMPORTAÇÃO EM MASSA INTELIGENTE (CELULAR SAFE)
 # ====================================
 
 with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
 
-    texto = st.text_area("Cole usuários / senhas / nomes (qualquer formato)", height=300)
-
+    texto = st.text_area("Cole usuários / senhas / nomes", height=300)
     valor_padrao = st.number_input("Valor Mensal", value=25.0, step=1.0)
 
     if st.button("Processar Importação"):
 
-        linhas = [l.strip() for l in texto.splitlines() if l.strip()]
+        linhas = texto.splitlines()
 
-        tabela_preview = []
         clientes_novos = []
+        tabela = []
 
         hoje = datetime.now()
         ano = hoje.year
@@ -37,23 +36,32 @@ with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
 
         # vencimento fixo dia 10
         if hoje.day > 10:
-            mes += 1
+            mes = mes + 1
 
         if mes > 12:
             mes = 1
-            ano += 1
+            ano = ano + 1
 
-        vencimento_fixo = datetime(ano, mes, 10).strftime("%d/%m/%Y")
+        vencimento = datetime(ano, mes, 10).strftime("%d/%m/%Y")
 
-        for linha in linhas:
+        i = 0
+
+        while i < len(linhas):
+
+            linha = linhas[i].strip()
+
+            if linha == "":
+                i += 1
+                continue
 
             partes = linha.split()
 
             if len(partes) >= 3:
+                a = partes[0]
+                b = partes[1]
+                c = " ".join(partes[2:])
 
-                a, b, c = partes[0], partes[1], " ".join(partes[2:])
-
-                if any(char.isdigit() for char in a):
+                if any(x.isdigit() for x in a):
                     usuario = a
                     senha = b
                     nome = c
@@ -63,12 +71,12 @@ with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
                     senha = c
 
             elif len(partes) == 2:
-
                 usuario = partes[0]
                 senha = partes[1]
                 nome = partes[0]
 
             else:
+                i += 1
                 continue
 
             clientes_novos.append({
@@ -78,27 +86,21 @@ with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
                 "senha": senha,
                 "valor": valor_padrao,
                 "observacao": "",
-                "vencimento": vencimento_fixo,
+                "vencimento": vencimento,
                 "status": "Pendente"
             })
 
-            tabela_preview.append({
-                "Nome": nome,
-                "Usuário": usuario,
-                "Senha": senha,
-                "Vencimento": vencimento_fixo
-            })
+            tabela.append([nome, usuario, senha])
+
+            i += 1
 
         clientes.extend(clientes_novos)
 
         ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
 
-        st.success(f"{len(clientes_novos)} clientes importados!")
+        st.success(str(len(clientes_novos)) + " clientes importados")
 
-        if tabela_preview:
-            st.subheader("📋 Pré-visualização")
-            st.dataframe(pd.DataFrame(tabela_preview), use_container_width=True, hide_index=True)
-
+        st.dataframe(tabela)
         st.rerun()
 
             # =========================
