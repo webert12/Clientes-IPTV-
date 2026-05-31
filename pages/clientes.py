@@ -1,6 +1,3 @@
-IPTV sistema
-
-
 import streamlit as st
 import json
 import pandas as pd
