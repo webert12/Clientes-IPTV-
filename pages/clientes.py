@@ -19,8 +19,13 @@ clientes = json.loads(ARQ.read_text(encoding="utf-8"))
 # =========================
 
 with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
+with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
 
-    texto = st.text_area("Cole usuários / senhas / nomes", height=300)
+    texto = st.text_area(
+        "Cole usuários / senhas / nomes (qualquer formato)",
+        height=300
+    )
+
     valor_padrao = st.number_input("Valor Mensal", value=25.0, step=1.0)
 
     if st.button("Processar Importação"):
@@ -29,6 +34,8 @@ with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
 
         clientes_novos = []
         tabela_preview = []
+
+        hoje = datetime.now()
 
         for linha in linhas:
 
@@ -58,20 +65,19 @@ with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
                 continue
 
             # =========================
-            # VENCIMENTO FIXO DIA 10
+            # VENCIMENTO DIA 10 CORRIGIDO
             # =========================
             ano = hoje.year
             mes = hoje.month
-            hoje = datetime.now()
 
-# se já passou do dia 10, joga para o próximo mês
-if hoje.day > 10:
-    mes += 1
-    if mes > 12:
-        mes = 1
-        ano += 1
+            if hoje.day > 10:
+                mes += 1
+                if mes > 12:
+                    mes = 1
+                    ano += 1
 
-vencimento = datetime(ano, mes, 10)
+            vencimento = datetime(ano, mes, 10)
+
             clientes_novos.append({
                 "nome": nome,
                 "whatsapp": "",
@@ -91,7 +97,10 @@ vencimento = datetime(ano, mes, 10)
 
         clientes.extend(clientes_novos)
 
-        ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
+        ARQ.write_text(
+            json.dumps(clientes, indent=4, ensure_ascii=False),
+            encoding="utf-8"
+        )
 
         st.success(f"{len(clientes_novos)} clientes importados!")
 
@@ -100,7 +109,6 @@ vencimento = datetime(ano, mes, 10)
             st.dataframe(pd.DataFrame(tabela_preview), use_container_width=True, hide_index=True)
 
         st.rerun()
-
 # =========================
 # STATUS COLORIDO
 # =========================
