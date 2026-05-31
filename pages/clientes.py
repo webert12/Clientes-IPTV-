@@ -64,8 +64,16 @@ with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
             ano = hoje.year
             mes = hoje.month
 
-            vencimento = datetime(ano, mes, 10)
+            hoje = datetime.now()
 
+# se já passou do dia 10, joga para o próximo mês
+if hoje.day > 10:
+    mes += 1
+    if mes > 12:
+        mes = 1
+        ano += 1
+
+vencimento = datetime(ano, mes, 10)
             clientes_novos.append({
                 "nome": nome,
                 "whatsapp": "",
