@@ -34,9 +34,89 @@ with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
         tabela_preview = []
         clientes_novos = []
 
+        hoje = datetime.now()
+        ano = hoje.year
+        mes = hoje.month
+
+        # ============================
+        # REGRA: VENCIMENTO DIA 10
+        # ============================
+        if hoje.day > 10:
+            mes += 1
+
+        if mes > 12:
+            mes = 1
+            ano += 1
+
+        vencimento_fixo = datetime(ano, mes, 10).strftime("%d/%m/%Y")
+
         for linha in linhas:
 
             partes = linha.split()
+
+            # =========================
+            # 3 CAMPOS
+            # =========================
+            if len(partes) >= 3:
+
+                a, b, c = partes[0], partes[1], " ".join(partes[2:])
+
+                if any(char.isdigit() for char in a):
+                    usuario = a
+                    senha = b
+                    nome = c
+                else:
+                    nome = a
+                    usuario = b
+                    senha = c
+
+            # =========================
+            # 2 CAMPOS
+            # =========================
+            elif len(partes) == 2:
+
+                usuario = partes[0]
+                senha = partes[1]
+                nome = partes[0]
+
+            else:
+                continue
+
+            clientes_novos.append({
+                "nome": nome,
+                "whatsapp": "",
+                "usuario": usuario,
+                "senha": senha,
+                "valor": valor_padrao,
+                "observacao": "",
+                "vencimento": vencimento_fixo,
+                "status": "Pendente"
+            })
+
+            tabela_preview.append({
+                "Nome": nome,
+                "Usuário": usuario,
+                "Senha": senha,
+                "Vencimento": vencimento_fixo
+            })
+
+        # salva no sistema
+        clientes.extend(clientes_novos)
+
+        ARQ.write_text(
+            json.dumps(clientes, indent=4, ensure_ascii=False),
+            encoding="utf-8"
+        )
+
+        st.success(f"{len(clientes_novos)} clientes importados com vencimento dia 10!")
+
+        # preview
+        if tabela_preview:
+            st.subheader("📋 Pré-visualização da Importação")
+            df_preview = pd.DataFrame(tabela_preview)
+            st.dataframe(df_preview, use_container_width=True, hide_index=True)
+
+        st.rerun()
 
             # =========================
             # CASO 3 CAMPOS (nome usuário senha OU usuário senha nome)
