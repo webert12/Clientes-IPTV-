@@ -25,7 +25,6 @@ def carregar_clientes():
 def salvar_no_banco(lista_clientes):
     with engine.begin() as conn:
         for c in lista_clientes:
-            # Upsert: Insere ou atualiza o cliente pelo nome
             sql = text("""
                 INSERT INTO clientes (nome, data_json) 
                 VALUES (:nome, :data_json::jsonb)
@@ -41,46 +40,54 @@ st.title("👥 Gestão de Clientes")
 
 # --- IMPORTAÇÃO ---
 with st.expander("📥 Importar Clientes em Massa"):
-    texto = st.text_area("Cole usuários / senhas / nomes", height=200)
+    texto = st.text_area("Cole: Usuario Senha (um por linha)", height=200)
     valor_padrao = st.number_input("Valor Mensal", value=25.0, step=1.0)
     if st.button("Processar Importação"):
         linhas = [l.strip() for l in texto.splitlines() if l.strip()]
         hoje = datetime.now()
         for linha in linhas:
             partes = linha.split()
-            nome = partes[2] if len(partes) >= 3 else partes[0]
-            st.session_state.clientes.append({
-                "nome": nome, "whatsapp": "", "usuario": partes[0], "senha": partes[1],
-                "valor": valor_padrao, "telas": 1, "status": "Pendente",
-                "vencimento": datetime(hoje.year, hoje.month + 1, 10).strftime("%d/%m/%Y")
-            })
+            if len(partes) >= 2:
+                user, pwd = partes[0], partes[1]
+                st.session_state.clientes.append({
+                    "nome": user, "whatsapp": "", "usuario": user, "senha": pwd,
+                    "valor": valor_padrao, "telas": 1, "status": "Pendente",
+                    "vencimento": datetime(hoje.year, hoje.month + 1, 10).strftime("%d/%m/%Y")
+                })
         salvar_no_banco(st.session_state.clientes)
         st.rerun()
 
-# --- FILTROS ---
+# --- FILTROS E TABELA ---
 pesquisa = st.text_input("🔍 Pesquisar cliente")
 clientes_filtrados = [c for c in st.session_state.clientes if pesquisa.lower() in c['nome'].lower()]
 
-# --- TABELA ---
-df = pd.DataFrame(clientes_filtrados)
-if not df.empty:
+if clientes_filtrados:
+    df = pd.DataFrame(clientes_filtrados)
     st.dataframe(df[["nome", "usuario", "senha", "vencimento", "status"]], use_container_width=True)
 
-# --- AÇÕES ---
-st.divider()
-st.subheader("✏️ Editar ou Receber Pagamento")
-nomes = [c["nome"] for c in st.session_state.clientes]
-sel = st.selectbox("Selecione o Cliente", nomes)
-cli = next(c for c in st.session_state.clientes if c["nome"] == sel)
-
-cli["usuario"] = st.text_input("Usuário", cli["usuario"])
-cli["senha"] = st.text_input("Senha", cli["senha"])
-if st.button("Salvar Alterações"):
-    salvar_no_banco(st.session_state.clientes)
-    st.success("Salvo!")
-    st.rerun()
-
-if st.button("💵 Receber Pagamento"):
-    cli["status"] = "Recebido"
-    salvar_no_banco(st.session_state.clientes)
-    st.rerun()
+    # --- AÇÕES (CORRIGIDO PARA EVITAR STOPITERATION) ---
+    st.divider()
+    st.subheader("✏️ Editar ou Receber Pagamento")
+    nomes = [c["nome"] for c in clientes_filtrados]
+    sel = st.selectbox("Selecione o Cliente", nomes)
+    
+    # Busca segura usando next com default None
+    cli = next((c for c in st.session_state.clientes if c["nome"] == sel), None)
+    
+    if cli:
+        cli["usuario"] = st.text_input("Usuário", cli["usuario"])
+        cli["senha"] = st.text_input("Senha", cli["senha"])
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Salvar Alterações"):
+                salvar_no_banco(st.session_state.clientes)
+                st.success("Salvo!")
+                st.rerun()
+        with col2:
+            if st.button("💵 Receber Pagamento"):
+                cli["status"] = "Recebido"
+                salvar_no_banco(st.session_state.clientes)
+                st.rerun()
+else:
+    st.info("Nenhum cliente cadastrado ou encontrado.")
