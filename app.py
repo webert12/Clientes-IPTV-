@@ -1,7 +1,7 @@
 import streamlit as st
 import json
 import pandas as pd
-from sqlalchemy import create_engine, text, exc
+from sqlalchemy import create_engine, text
 
 # Configuração
 st.set_page_config(page_title="Gestão IPTV Pro", page_icon="👥", layout="wide")
@@ -111,3 +111,17 @@ with col2:
             salvar_no_banco(st.session_state.clientes)
             st.session_state.marcar_todos = False
             st.rerun()
+
+# --- REGISTRO DE PAGAMENTO ---
+st.divider()
+st.subheader("💳 Registrar Pagamento")
+nome_sel = st.selectbox("Selecione o cliente para confirmar pagamento", [c['nome'] for c in st.session_state.clientes])
+cli = next((c for c in st.session_state.clientes if c['nome'] == nome_sel), None)
+
+if cli:
+    st.write(f"Status atual: **{cli.get('status', 'Pendente')}**")
+    if st.button("✅ Confirmar Pagamento"):
+        cli['status'] = "Confirmado"
+        salvar_no_banco(st.session_state.clientes)
+        st.success(f"Pagamento de {cli['nome']} confirmado!")
+        st.rerun()
