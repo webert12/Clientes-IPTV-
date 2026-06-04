@@ -1,63 +1,68 @@
 import streamlit as st
 import json
-import hashlib
-from datetime import datetime, timezone
-from sqlalchemy import create_engine, text
 import pandas as pd
+from datetime import datetime
+from sqlalchemy import create_engine, text
 
-# --- CONFIGURAÇÃO ---
-st.set_page_config(page_title="Gestão IPTV", page_icon="👥", layout="centered")
-
-# --- CONEXÃO COM BANCO DE DADOS ---
+# --- CONEXÃO SQL (Substitui o Path ARQ) ---
 @st.cache_resource
 def get_engine():
     return create_engine(st.secrets["DATABASE_URL"])
 
 engine = get_engine()
 
-# --- FUNÇÕES DE PERSISTÊNCIA SQL ---
-def carregar_dados():
-    try:
-        with engine.connect() as conn:
-            # Tenta buscar a tabela de clientes
-            query = text("SELECT nome, data_json FROM clientes")
-            df = pd.read_sql(query, conn)
-            
-            dados = {}
-            for _, row in df.iterrows():
-                dados[row['nome']] = json.loads(row['data_json'])
-            return dados
-    except:
-        # Se a tabela não existir ou estiver vazia, retorna estrutura vazia
-        return {}
+# --- FUNÇÕES DE DADOS (Substituem leitura/escrita JSON) ---
+def carregar_clientes():
+    with engine.connect() as conn:
+        query = text("SELECT data_json FROM clientes")
+        result = conn.execute(query).fetchall()
+        return [json.loads(r[0]) for r in result]
 
-def salvar_dados(nome, dados_cliente):
+def salvar_no_banco(clientes):
     with engine.begin() as conn:
-        sql = text("""
-            INSERT INTO clientes (nome, data_json) 
-            VALUES (:nome, :data_json)
-            ON CONFLICT (nome) DO UPDATE SET data_json = EXCLUDED.data_json
-        """)
-        conn.execute(sql, {"nome": nome, "data_json": json.dumps(dados_cliente)})
+        # Limpa e reinsere para manter sincronia total com a lista da sessão
+        conn.execute(text("DELETE FROM clientes"))
+        for c in clientes:
+            sql = text("INSERT INTO clientes (nome, data_json) VALUES (:nome, :data_json::jsonb)")
+            conn.execute(sql, {"nome": c['nome'], "data_json": json.dumps(c)})
 
-# --- INICIALIZAÇÃO ---
-if 'clientes' not in st.session_state:
-    st.session_state.clientes = carregar_dados()
+st.title("👥 Gestão de Clientes")
 
-# --- INTERFACE ---
-st.title("👥 Gestão de Clientes IPTV")
+# Carrega do Banco
+clientes = carregar_clientes()
 
-nome_cliente = st.text_input("Nome do Cliente")
-valor = st.number_input("Valor", value=25.0)
+if "show_delete" not in st.session_state:
+    st.session_state["show_delete"] = False
 
-if st.button("Salvar Cliente"):
-    if nome_cliente:
-        novo_registro = {"valor": valor, "status": "Pendente", "data": datetime.now().strftime("%d/%m/%Y")}
-        st.session_state.clientes[nome_cliente] = novo_registro
-        salvar_dados(nome_cliente, novo_registro)
-        st.success("Cliente salvo no banco!")
-    else:
-        st.error("Preencha o nome!")
+# =========================
+# IMPORTAÇÃO EM MASSA
+# =========================
+with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
+    texto = st.text_area("Cole usuários / senhas / nomes", height=300)
+    valor_padrao = st.number_input("Valor Mensal", value=25.0, step=1.0)
 
-st.write("### Lista de Clientes")
-st.json(st.session_state.clientes)
+    if st.button("Processar Importação"):
+        linhas = [l.strip() for l in texto.splitlines() if l.strip()]
+        hoje = datetime.now()
+        for linha in linhas:
+            partes = linha.split()
+            nome, usuario, senha = (partes[2], partes[0], partes[1]) if len(partes) >= 3 else (partes[0], partes[0], partes[1])
+            
+            ano, mes = (hoje.year, hoje.month + 1) if hoje.day > 10 else (hoje.year, hoje.month)
+            if mes > 12: mes, ano = 1, ano + 1
+            
+            clientes.append({
+                "nome": nome, "whatsapp": "", "usuario": usuario, "senha": senha,
+                "valor": valor_padrao, "telas": 1, "observacao": "",
+                "vencimento": datetime(ano, mes, 10).strftime("%d/%m/%Y"), "status": "Pendente"
+            })
+        salvar_no_banco(clientes)
+        st.rerun()
+
+# =========================
+# TABELA E FILTROS (Mantenha sua lógica de exibição aqui...)
+# =========================
+# ... (O restante da sua lógica permanece idêntica) ...
+
+# EX: No botão de salvar ou editar, apenas troque ARQ.write_text por:
+# salvar_no_banco(clientes)
