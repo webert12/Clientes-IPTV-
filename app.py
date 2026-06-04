@@ -1,7 +1,6 @@
 import streamlit as st
 import json
 import pandas as pd
-from datetime import datetime
 from sqlalchemy import create_engine, text, exc
 
 # Configuração
@@ -13,7 +12,7 @@ def get_engine():
 
 engine = get_engine()
 
-# --- DADOS INICIAIS (Os 50 clientes solicitados) ---
+# --- DADOS INICIAIS ---
 CLIENTES_INICIAIS = [
     {"nome": "Rejane", "usuario": "Rejaneita", "senha": "1234052466960319", "status": "Pendente"},
     {"nome": "Regi", "usuario": "Regijr", "senha": "1234575761818", "status": "Pendente"},
@@ -73,7 +72,6 @@ def carregar_clientes():
         with engine.connect() as conn:
             result = conn.execute(text("SELECT data_json FROM clientes")).fetchall()
             if not result:
-                # Se estiver vazio, carrega os iniciais
                 salvar_no_banco(CLIENTES_INICIAIS)
                 return CLIENTES_INICIAIS
             return [json.loads(r[0]) for r in result]
@@ -89,17 +87,27 @@ def salvar_no_banco(lista_clientes):
 # --- INICIALIZAÇÃO ---
 if 'clientes' not in st.session_state:
     st.session_state.clientes = carregar_clientes()
+if 'marcar_todos' not in st.session_state:
+    st.session_state.marcar_todos = False
 
 st.title("👥 Gestão de Clientes IPTV")
 
 # --- LISTAGEM E EXCLUSÃO ---
 df = pd.DataFrame(st.session_state.clientes)
-df.insert(0, "🗑️", False)
+df.insert(0, "🗑️", st.session_state.marcar_todos)
 edited_df = st.data_editor(df, hide_index=True, use_container_width=True)
 
-if st.button("🗑️ Excluir Selecionados"):
-    selecionados = edited_df[edited_df["🗑️"] == True]
-    if not selecionados.empty:
-        st.session_state.clientes = [c for c in st.session_state.clientes if c["nome"] not in selecionados["nome"].values]
-        salvar_no_banco(st.session_state.clientes)
+col1, col2 = st.columns([1, 4])
+with col1:
+    if st.button("✅ Marcar Todos"):
+        st.session_state.marcar_todos = not st.session_state.marcar_todos
         st.rerun()
+
+with col2:
+    if st.button("🗑️ Excluir Selecionados"):
+        selecionados = edited_df[edited_df["🗑️"] == True]
+        if not selecionados.empty:
+            st.session_state.clientes = [c for c in st.session_state.clientes if c["nome"] not in selecionados["nome"].values]
+            salvar_no_banco(st.session_state.clientes)
+            st.session_state.marcar_todos = False
+            st.rerun()
