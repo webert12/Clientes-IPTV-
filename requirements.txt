@@ -4,4 +4,7 @@ plotly
 openpyxl
 supabase
 reportlab
+sqlalchemy
+psycopg2-binary
+
 
