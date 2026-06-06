@@ -12,7 +12,24 @@ def get_engine():
 
 engine = get_engine()
 
-# --- DADOS INICIAIS (50 Clientes Verificados - Sem registros "app") ---
+# --- CRIAÇÃO AUTOMÁTICA DA TABELA ---
+def inicializar_banco():
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS clientes (
+                    id SERIAL PRIMARY KEY,
+                    nome VARCHAR(255),
+                    data_json JSONB
+                );
+            """))
+    except Exception as e:
+        st.error(f"⚠️ Erro crítico ao criar a estrutura do banco de dados: {e}")
+
+# Garante que a tabela exista antes de qualquer operação
+inicializar_banco()
+
+# --- DADOS INICIAIS (50 Clientes Sem registros "app") ---
 CLIENTES_INICIAIS = [
     {"nome": "Rejane", "usuario": "Rejaneita", "senha": "1234052466960319", "status": "Pendente", "valor": 25.0},
     {"nome": "Regi", "usuario": "Regijr", "senha": "1234575761818", "status": "Pendente", "valor": 25.0},
@@ -72,7 +89,7 @@ def carregar_clientes():
         with engine.connect() as conn:
             result = conn.execute(text("SELECT data_json FROM clientes")).fetchall()
             if not result:
-                # Se a tabela estiver vazia, popula com os dados iniciais padrão seguros
+                # Se a tabela acabou de ser criada ou está vazia, popula com os dados iniciais seguros
                 with engine.begin() as tx:
                     for c in CLIENTES_INICIAIS:
                         tx.execute(text("INSERT INTO clientes (nome, data_json) VALUES (:nome, :data_json::jsonb)"), 
@@ -80,7 +97,6 @@ def carregar_clientes():
                 return CLIENTES_INICIAIS
             return [json.loads(r[0]) for r in result]
     except Exception as e:
-        # Segurança: se falhar a conexão, NÃO retorna a lista padrão para não arriscar sobrescrever os dados reais em saves futuros
         st.error(f"⚠️ Erro temporário ao acessar o banco de dados. Tente atualizar a página. Detalhes: {e}")
         return None
 
@@ -122,7 +138,6 @@ if st.session_state.clientes:
     df = pd.DataFrame(st.session_state.clientes)
     df.insert(0, "🗑️", st.session_state.marcar_todos)
     
-    # Exibe editor com suporte a edições diretas em texto e status
     edited_df = st.data_editor(df, hide_index=True, use_container_width=True)
 
     col1, col2, col3 = st.columns([1.5, 2, 4])
@@ -134,7 +149,7 @@ if st.session_state.clientes:
     with col2:
         if st.button("🗑️ Excluir Selecionados"):
             selecionados = edited_df[edited_df["🗑️"] == True]
-            if not len(selecionados) == 0:
+            if not selecionados.empty:
                 st.session_state.clientes = [c for c in st.session_state.clientes if c["nome"] not in selecionados["nome"].values]
                 salvar_no_banco(st.session_state.clientes)
                 st.session_state.marcar_todos = False
@@ -143,7 +158,6 @@ if st.session_state.clientes:
                 
     with col3:
         if st.button("💾 Salvar Modificações da Tabela"):
-            # Coleta todas as modificações textuais feitas no st.data_editor e persiste no banco de dados permanentemente
             dados_atualizados = edited_df.drop(columns=["🗑️"]).to_dict(orient="records")
             st.session_state.clientes = dados_atualizados
             salvar_no_banco(dados_atualizados)
