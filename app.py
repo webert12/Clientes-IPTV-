@@ -92,7 +92,9 @@ def carregar_clientes():
                         tx.execute(text("INSERT INTO clientes (nome, data_json) VALUES (:nome, CAST(:data_json AS JSONB))"), 
                                    {"nome": c['nome'], "data_json": json.dumps(c)})
                 result = conn.execute(text("SELECT data_json FROM clientes ORDER BY id ASC")).fetchall()
-            return [json.loads(r[0]) for r in result]
+            
+            # AJUSTE CIRÚRGICO: Só aplica o json.loads se o dado vier como texto puro (string)
+            return [r[0] if isinstance(r[0], dict) else json.loads(r[0]) for r in result]
     except Exception as e:
         st.error(f"⚠️ Erro ao carregar dados do banco: {e}")
         return []
@@ -118,17 +120,16 @@ def ao_alterar_tabela():
         for idx, mudancas in alteracoes.items():
             st.session_state.clientes[idx].update(mudancas)
         salvar_no_banco(st.session_state.clientes)
-        # Recarrega para garantir que os cálculos do topo peguem o dado atualizado imediatamente
         st.rerun()
 
-# --- CÁLCULO DOS CARD FINANCEIROS (Sempre dinâmicos e precisos) ---
+# --- CÁLCULO DOS CARD FINANCEIROS ---
 total_clientes = len(st.session_state.clientes)
 previsto = sum(float(c.get('valor', 25.90)) for c in st.session_state.clientes)
 recebido = sum(float(c.get('valor', 25.90)) for c in st.session_state.clientes 
                if str(c.get('status', '')).strip().lower() == 'confirmado')
 pendente = previsto - recebido
 
-# --- LOUYOUT DA TELA (Idêntico ao seu print) ---
+# --- LOUYOUT DA TELA ---
 st.title(" Dashboard Vision Play TV")
 
 st.metric("👥 Clientes", f"{total_clientes}")
@@ -143,10 +144,8 @@ st.subheader("👥 Lista de Clientes")
 if st.session_state.clientes:
     df = pd.DataFrame(st.session_state.clientes)
     
-    # Organiza a exibição das colunas desejadas
     df = df[["nome", "usuario", "senha", "status", "valor"]]
     
-    # Renderiza o editor com validação automática por Selectbox
     st.data_editor(
         df,
         key="editor_principal",
