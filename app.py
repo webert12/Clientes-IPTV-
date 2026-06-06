@@ -28,7 +28,7 @@ def inicializar_banco():
 
 inicializar_banco()
 
-# --- DADOS INICIAIS (Ajustados para R$ 25.90 para fechar os R$ 1295.00 do seu print) ---
+# --- DADOS INICIAIS ---
 CLIENTES_INICIAIS = [
     {"nome": "Rejane", "usuario": "Rejaneita", "senha": "1234052466960319", "status": "Pendente", "valor": 25.90},
     {"nome": "Regi", "usuario": "Regijr", "senha": "1234575761818", "status": "Pendente", "valor": 25.90},
@@ -82,7 +82,7 @@ CLIENTES_INICIAIS = [
     {"nome": "Renato", "usuario": "RenatoDel0", "senha": "997708882", "status": "Pendente", "valor": 25.90}
 ]
 
-# --- PERSISTÊNCIA ---
+# --- PERSISTÊNCIA CORRIGIDA (Utilizando CAST) ---
 def carregar_clientes():
     try:
         with engine.connect() as conn:
@@ -90,7 +90,7 @@ def carregar_clientes():
             if not result:
                 with engine.begin() as tx:
                     for c in CLIENTES_INICIAIS:
-                        tx.execute(text("INSERT INTO clientes (nome, data_json) VALUES (:nome, :data_json::jsonb)"), 
+                        tx.execute(text("INSERT INTO clientes (nome, data_json) VALUES (:nome, CAST(:data_json AS JSONB))"), 
                                    {"nome": c['nome'], "data_json": json.dumps(c)})
                 return CLIENTES_INICIAIS
             return [json.loads(r[0]) for r in result]
@@ -103,7 +103,7 @@ def salvar_no_banco(lista_clientes):
         with engine.begin() as conn:
             conn.execute(text("DELETE FROM clientes"))
             for c in lista_clientes:
-                sql = text("INSERT INTO clientes (nome, data_json) VALUES (:nome, :data_json::jsonb)")
+                sql = text("INSERT INTO clientes (nome, data_json) VALUES (:nome, CAST(:data_json AS JSONB))")
                 conn.execute(sql, {"nome": c['nome'], "data_json": json.dumps(c)})
     except exc.SQLAlchemyError as e:
         st.error(f"Erro ao salvar alterações no banco: {e}")
@@ -115,10 +115,9 @@ if 'clientes' not in st.session_state:
 if 'marcar_todos' not in st.session_state:
     st.session_state.marcar_todos = False
 
-# --- CÁLCULO DOS METRICS BLINDADO (Igual ao seu layout) ---
+# --- CÁLCULO DOS METRICS BLINDADO ---
 total_clientes = len(st.session_state.clientes)
 
-# Força a conversão para float e faz checagem de texto inteligente (ignora maiúsculas/minúsculas)
 previsto = sum(float(c.get('valor', 25.90)) for c in st.session_state.clientes)
 recebido = sum(float(c.get('valor', 25.90)) for c in st.session_state.clientes 
                if str(c.get('status', '')).strip().lower() in ['confirmado', 'pago'])
@@ -127,7 +126,6 @@ pendente = previsto - recebido
 # --- INTERFACE DO DASHBOARD ---
 st.title("📊 Dashboard Vision Play TV")
 
-# Exibição idêntica à do seu print (se adaptam perfeitamente na tela do celular)
 st.metric("👥 Clientes", f"{total_clientes}")
 st.metric("💰 Previsto", f"R$ {previsto:.2f}")
 st.metric("✅ Recebido", f"R$ {recebido:.2f}")
@@ -178,6 +176,6 @@ if st.session_state.clientes:
             cli['status'] = "Confirmado"
             salvar_no_banco(st.session_state.clientes)
             st.success(f"Pagamento de {cli['nome']} atualizado!")
-            st.rerun()  # Recarrega a página aplicando as contas instantaneamente!
+            st.rerun() 
 else:
     st.info("Nenhum cliente cadastrado ou banco de dados vazio.")
