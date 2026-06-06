@@ -82,21 +82,20 @@ CLIENTES_INICIAIS = [
     {"nome": "Renato", "usuario": "RenatoDel0", "senha": "997708882", "status": "Pendente", "valor": 25.90}
 ]
 
-# --- PERSISTÊNCIA CORRIGIDA (Utilizando CAST) ---
 def carregar_clientes():
     try:
         with engine.connect() as conn:
-            result = conn.execute(text("SELECT data_json FROM clientes")).fetchall()
+            result = conn.execute(text("SELECT data_json FROM clientes ORDER BY id ASC")).fetchall()
             if not result:
                 with engine.begin() as tx:
                     for c in CLIENTES_INICIAIS:
                         tx.execute(text("INSERT INTO clientes (nome, data_json) VALUES (:nome, CAST(:data_json AS JSONB))"), 
                                    {"nome": c['nome'], "data_json": json.dumps(c)})
-                return CLIENTES_INICIAIS
+                result = conn.execute(text("SELECT data_json FROM clientes ORDER BY id ASC")).fetchall()
             return [json.loads(r[0]) for r in result]
     except Exception as e:
-        st.error(f"⚠️ Erro ao acessar o banco de dados: {e}")
-        return None
+        st.error(f"⚠️ Erro ao carregar dados do banco: {e}")
+        return []
 
 def salvar_no_banco(lista_clientes):
     try:
@@ -108,23 +107,29 @@ def salvar_no_banco(lista_clientes):
     except exc.SQLAlchemyError as e:
         st.error(f"Erro ao salvar alterações no banco: {e}")
 
-# Inicialização do estado local
+# --- CONTROLE DE SESSÃO ---
 if 'clientes' not in st.session_state:
-    dados = carregar_clientes()
-    st.session_state.clientes = dados if dados is not None else []
-if 'marcar_todos' not in st.session_state:
-    st.session_state.marcar_todos = False
+    st.session_state.clientes = carregar_clientes()
 
-# --- CÁLCULO DOS METRICS BLINDADO ---
+# --- CALLBACK PARA SALVAMENTO AUTOMÁTICO DA TABELA ---
+def ao_alterar_tabela():
+    alteracoes = st.session_state.editor_principal.get("edited_rows", {})
+    if alteracoes:
+        for idx, mudancas in alteracoes.items():
+            st.session_state.clientes[idx].update(mudancas)
+        salvar_no_banco(st.session_state.clientes)
+        # Recarrega para garantir que os cálculos do topo peguem o dado atualizado imediatamente
+        st.rerun()
+
+# --- CÁLCULO DOS CARD FINANCEIROS (Sempre dinâmicos e precisos) ---
 total_clientes = len(st.session_state.clientes)
-
 previsto = sum(float(c.get('valor', 25.90)) for c in st.session_state.clientes)
 recebido = sum(float(c.get('valor', 25.90)) for c in st.session_state.clientes 
-               if str(c.get('status', '')).strip().lower() in ['confirmado', 'pago'])
+               if str(c.get('status', '')).strip().lower() == 'confirmado')
 pendente = previsto - recebido
 
-# --- INTERFACE DO DASHBOARD ---
-st.title("📊 Dashboard Vision Play TV")
+# --- LOUYOUT DA TELA (Idêntico ao seu print) ---
+st.title(" Dashboard Vision Play TV")
 
 st.metric("👥 Clientes", f"{total_clientes}")
 st.metric("💰 Previsto", f"R$ {previsto:.2f}")
@@ -133,49 +138,46 @@ st.metric("⚠️ Pendente", f"R$ {pendente:.2f}")
 
 st.divider()
 
-# --- TABELA DE GERENCIAMENTO ---
+# --- TABELA DE GERENCIAMENTO INTELIGENTE ---
+st.subheader("👥 Lista de Clientes")
 if st.session_state.clientes:
     df = pd.DataFrame(st.session_state.clientes)
-    df.insert(0, "🗑️", st.session_state.marcar_todos)
     
-    edited_df = st.data_editor(df, hide_index=True, use_container_width=True)
+    # Organiza a exibição das colunas desejadas
+    df = df[["nome", "usuario", "senha", "status", "valor"]]
+    
+    # Renderiza o editor com validação automática por Selectbox
+    st.data_editor(
+        df,
+        key="editor_principal",
+        on_change=ao_alterar_tabela,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "nome": st.column_config.TextColumn("Nome", disabled=True),
+            "usuario": st.column_config.TextColumn("Usuário", disabled=True),
+            "senha": st.column_config.TextColumn("Senha", disabled=True),
+            "status": st.column_config.SelectboxColumn(
+                "Status",
+                options=["Pendente", "Confirmado"],
+                required=True
+            ),
+            "valor": st.column_config.NumberColumn("Valor (R$)", format="R$ %.2f", disabled=True)
+        }
+    )
 
-    col1, col2, col3 = st.columns([1.5, 2, 4])
-    with col1:
-        if st.button("✅ Marcar/Desmarcar Todos"):
-            st.session_state.marcar_todos = not st.session_state.marcar_todos
-            st.rerun()
-
-    with col2:
-        if st.button("🗑️ Excluir Selecionados"):
-            selecionados = edited_df[edited_df["🗑️"] == True]
-            if not selecionados.empty:
-                st.session_state.clientes = [c for c in st.session_state.clientes if c["nome"] not in selecionados["nome"].values]
-                salvar_no_banco(st.session_state.clientes)
-                st.session_state.marcar_todos = False
-                st.success("Removidos com sucesso.")
-                st.rerun()
-                
-    with col3:
-        if st.button("💾 Salvar Modificações da Tabela"):
-            dados_atualizados = edited_df.drop(columns=["🗑️"]).to_dict(orient="records")
-            st.session_state.clientes = dados_atualizados
-            salvar_no_banco(dados_atualizados)
-            st.success("Tabela salva com sucesso!")
-            st.rerun()
-
-    # --- CONFIRMAÇÃO DE PAGAMENTO RÁPIDA ---
+    # --- REGISTRADOR RÁPIDO PARALELO ---
     st.divider()
-    st.subheader("💳 Registrar Pagamento rápido")
-    nome_sel = st.selectbox("Selecione o cliente para confirmar pagamento", [c['nome'] for c in st.session_state.clientes])
-    cli = next((c for c in st.session_state.clientes if c['nome'] == nome_sel), None)
-
-    if cli:
-        st.write(f"Status atual de **{cli['nome']}**: {cli.get('status', 'Pendente')}")
-        if st.button("✅ Confirmar Pagamento"):
-            cli['status'] = "Confirmado"
-            salvar_no_banco(st.session_state.clientes)
-            st.success(f"Pagamento de {cli['nome']} atualizado!")
-            st.rerun() 
+    st.subheader("💳 Registrar Pagamento Rápido")
+    nome_sel = st.selectbox("Selecione o cliente abaixo:", [c['nome'] for c in st.session_state.clientes])
+    
+    if st.button("⚡ Confirmar Pagamento do Selecionado", use_container_width=True):
+        for c in st.session_state.clientes:
+            if c['nome'] == nome_sel:
+                c['status'] = "Confirmado"
+                break
+        salvar_no_banco(st.session_state.clientes)
+        st.success(f"Sucesso! O pagamento de {nome_sel} foi processado.")
+        st.rerun()
 else:
-    st.info("Nenhum cliente cadastrado ou banco de dados vazio.")
+    st.info("Nenhum cliente cadastrado no momento.")
