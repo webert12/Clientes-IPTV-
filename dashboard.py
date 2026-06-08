@@ -9,11 +9,11 @@ from sqlalchemy import create_engine, text
 st.title("📊 Dashboard Vision Play TV")
 
 # ======================================
-# CONEXÃO COM O SUPABASE (POSTGRESQL)
+# CONEXÃO SEGURA COM O SUPABASE (VIA SECRETS)
 # ======================================
 @st.cache_resource
 def get_engine():
-    # Puxa a string de conexão configurada nos Secrets do Streamlit Cloud
+    # Buscando a URL de forma segura do painel Secrets do Streamlit
     return create_engine(st.secrets["DATABASE_URL"])
 
 engine = get_engine()
