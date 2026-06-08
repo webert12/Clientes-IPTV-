@@ -192,27 +192,6 @@ else:
 
 st.divider()
 
-# ==========================
-# ÚLTIMOS RECEBIMENTOS
-# ==========================
-
-st.subheader("💵 Últimos Recebimentos")
-
-if historico:
-    ultimos = list(
-        reversed(historico)
-    )[:10]
-
-    st.dataframe(
-        pd.DataFrame(ultimos),
-        use_container_width=True,
-        hide_index=True
-    )
-else:
-    st.info(
-        "Nenhum recebimento registrado."
-    )
-
 # =========================
 # RECEBER PAGAMENTO
 # =========================
@@ -256,3 +235,25 @@ if clientes:
 
         st.success("Pagamento confirmado!")
         st.rerun()
+
+
+# ==========================
+# ÚLTIMOS RECEBIMENTOS
+# ==========================
+
+st.subheader("💵 Últimos Recebimentos")
+
+if historico:
+    ultimos = list(
+        reversed(historico)
+    )[:10]
+
+    st.dataframe(
+        pd.DataFrame(ultimos),
+        use_container_width=True,
+        hide_index=True
+    )
+else:
+    st.info(
+        "Nenhum recebimento registrado."
+    )
