@@ -3,7 +3,7 @@ import json
 import pandas as pd
 from sqlalchemy import create_engine, text, exc
 
-# Configuração da página
+# Configuração profissional da página unificada (Sem abas secundárias)
 st.set_page_config(page_title="Dashboard Vision Play TV", page_icon="📊", layout="wide")
 
 @st.cache_resource
@@ -12,9 +12,9 @@ def get_engine():
 
 engine = get_engine()
 
-# --- FUNÇÃO AUXILIAR DE TRATAMENTO SEGURO DE VALORES ---
+# --- FUNÇÃO AUXILIAR DE TRATAMENTO SEGURO DE VALORES (AJUSTADO PARA R$ 25,00) ---
 def converter_valor_seguro(val):
-    """Garante que o valor financeiro seja sempre um float válido, evitando quebras (NaN) no dashboard."""
+    """Garante que o valor financeiro seja sempre um float válido baseado na tabela de R$ 25,00."""
     try:
         if val is None or pd.isna(val):
             return 25.00
@@ -22,10 +22,11 @@ def converter_valor_seguro(val):
     except:
         return 25.00
 
-# --- CRIAÇÃO AUTOMÁTICA DA TABELA ---
+# --- CRIAÇÃO AUTOMÁTICA DA TABELA E CARGA DEMO ATUALIZADA ---
 def inicializar_banco():
     try:
         with engine.begin() as conn:
+            # Garante a existência da estrutura de dados persistente
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS clientes (
                     id SERIAL PRIMARY KEY,
@@ -33,6 +34,20 @@ def inicializar_banco():
                     data_json JSONB
                 );
             """))
+            
+            # SE O BANCO ESTIVER VAZIO: Popula com os novos valores de R$ 25,00 para demonstração imediata
+            total_registros = conn.execute(text("SELECT COUNT(*) FROM clientes")).scalar()
+            if total_registros == 0:
+                clientes_demonstracao = [
+                    {"nome": "Carlos Andrade", "usuario": "carlos.vision", "senha": "abc123", "status": "Confirmado", "valor": 25.00},
+                    {"nome": "Mariana Costa", "usuario": "mari.play", "senha": "xyz456", "status": "Pendente", "valor": 25.00},
+                    {"nome": "Felipe Melo", "usuario": "felipe.tv", "senha": "tv789", "status": "Confirmado", "valor": 25.00},
+                    {"nome": "Ana Beatriz", "usuario": "ana.vision", "senha": "vision99", "status": "Pendente", "valor": 25.00}
+                ]
+                for c in clientes_demonstracao:
+                    sql = text("INSERT INTO clientes (nome, data_json) VALUES (:nome, CAST(:data_json AS JSONB))")
+                    conn.execute(sql, {"nome": c['nome'], "data_json": json.dumps(c)})
+                    
     except Exception as e:
         st.error(f"⚠️ Erro crítico ao criar a estrutura do banco de dados: {e}")
 
@@ -45,7 +60,6 @@ def carregar_clientes():
             result = conn.execute(text("SELECT data_json FROM clientes ORDER BY id ASC")).fetchall()
             clientes = [r[0] if isinstance(r[0], dict) else json.loads(r[0]) for r in result]
             
-            # Sanitização estrutural ao carregar para garantir consistência de colunas
             lista_limpa = []
             for c in clientes:
                 lista_limpa.append({
@@ -66,7 +80,6 @@ def salvar_no_banco(lista_clientes):
         with engine.begin() as conn:
             conn.execute(text("DELETE FROM clientes"))
             for c in lista_clientes:
-                # Trata e limpa os dados individualmente antes de estruturar o JSONB definitivo
                 cliente_sanitizado = {
                     "nome": str(c.get("nome", "Novo Cliente")).strip(),
                     "usuario": str(c.get("usuario", "")).strip(),
@@ -79,23 +92,23 @@ def salvar_no_banco(lista_clientes):
     except exc.SQLAlchemyError as e:
         st.error(f"Erro ao salvar alterações no banco: {e}")
 
-# --- CONTROLE DE SESSÃO ---
+# --- CONTROLE DE SESSÃO REATIVA ---
 if 'clientes' not in st.session_state:
     st.session_state.clientes = carregar_clientes()
 
-# --- CALLBACK PARA SALVAMENTO AUTOMÁTICO COMPLETO ---
+# --- CALLBACK DE ATUALIZAÇÃO E RENOVAÇÃO EM TEMPO REAL ---
 def ao_alterar_tabela():
     estado_editor = st.session_state.editor_principal
     clientes_atuais = list(st.session_state.clientes)
     
-    # 1. Tratar edições de linhas existentes (Mudança de status, preço, nome...)
+    # 1. Tratar alterações de status ou valores direto no Dashboard
     if "edited_rows" in estado_editor:
         for idx, mudancas in estado_editor["edited_rows"].items():
             idx_int = int(idx)
             if idx_int < len(clientes_atuais):
                 clientes_atuais[idx_int].update(mudancas)
                 
-    # 2. Tratar novas linhas adicionadas na tabela
+    # 2. Tratar inserção rápida de novos clientes
     if "added_rows" in estado_editor:
         for nova_linha in estado_editor["added_rows"]:
             cliente = {
@@ -107,31 +120,27 @@ def ao_alterar_tabela():
             }
             clientes_atuais.append(cliente)
             
-    # 3. Tratar linhas excluídas na tabela
+    # 3. Tratar remoções diretas
     if "deleted_rows" in estado_editor:
         for idx in sorted([int(i) for i in estado_editor["deleted_rows"]], reverse=True):
             if idx < len(clientes_atuais):
                 clientes_atuais.pop(idx)
                 
-    # Atualiza o estado da sessão e commita diretamente no banco de dados
+    # Salva e sincroniza a sessão com o banco de dados de maneira limpa
     st.session_state.clientes = clientes_atuais
     salvar_no_banco(clientes_atuais)
-    
-    # NOTA PROFISSIONAL: st.rerun() removido daqui. 
-    # O Streamlit executará o recarregamento nativo imediatamente ao fechar este callback,
-    # garantindo sincronização perfeita e instantânea dos valores do painel financeiro.
 
-# --- CÁLCULO SEGURO DOS CARDS FINANCEIROS ---
+# --- ENGINE DE CÁLCULO MÓVEL DO DASHBOARD ---
 total_clientes = len(st.session_state.clientes)
 previsto = sum(converter_valor_seguro(c.get('valor')) for c in st.session_state.clientes)
 recebido = sum(converter_valor_seguro(c.get('valor')) for c in st.session_state.clientes 
                if str(c.get('status', '')).strip().lower() == 'confirmado')
 pendente = previsto - recebido
 
-# --- LAYOUT DA TELA ---
+# --- LAYOUT VISUAL DO DASHBOARD ---
 st.title("📊 Dashboard Vision Play TV")
 
-# Exibição limpa em colunas paralelas para apelo visual profissional
+# Métricas Gerenciais Atualizadas Instantaneamente
 col1, col2, col3, col4 = st.columns(4)
 with col1:
     st.metric("👥 Total de Clientes", f"{total_clientes}")
@@ -144,27 +153,26 @@ with col4:
 
 st.divider()
 
-# --- TABELA DE GERENCIAMENTO CENTRALIZADA ---
-st.subheader("👥 Gerenciamento de Clientes")
+# --- ÁREA DE GERENCIAMENTO INTEGRADA AO DASHBOARD (RENOVAÇÃO DIRETA AQUI) ---
+st.subheader("👥 Gerenciamento e Renovação de Clientes")
 
-# Criação do DataFrame com proteção analítica contra dados faltantes
 if not st.session_state.clientes:
     df = pd.DataFrame(columns=["nome", "usuario", "senha", "status", "valor"])
 else:
     df = pd.DataFrame(st.session_state.clientes)
-    # Garante a integridade técnica das colunas exibidas
     for col in ["nome", "usuario", "senha", "status", "valor"]:
         if col not in df.columns:
             df[col] = ""
     df = df[["nome", "usuario", "senha", "status", "valor"]]
 
+# Interface Avançada de Entrada de Dados Interativa
 st.data_editor(
     df,
     key="editor_principal",
     on_change=ao_alterar_tabela,
     use_container_width=True,
     hide_index=True,
-    num_rows="dynamic",  # Permite Adicionar (+) e Deletar linhas diretamente de forma limpa
+    num_rows="dynamic",
     column_config={
         "nome": st.column_config.TextColumn("Nome do Cliente", required=True),
         "usuario": st.column_config.TextColumn("Usuário de Acesso", required=True),
