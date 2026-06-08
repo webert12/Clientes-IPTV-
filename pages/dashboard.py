@@ -257,3 +257,37 @@ else:
     st.info(
         "Nenhum recebimento registrado."
     )
+
+# ======================================
+# EXPORTAÇÃO GERAL
+# ======================================
+
+st.subheader(
+    "📥 Backup Geral"
+)
+
+backup = {
+
+    "clientes": clientes,
+    "historico": historico,
+    "exportado_em": datetime.now().strftime(
+        "%d/%m/%Y %H:%M:%S"
+    )
+
+}
+
+st.download_button(
+
+    "📦 Baixar Backup JSON",
+
+    data=json.dumps(
+        backup,
+        indent=4,
+        ensure_ascii=False
+    ),
+
+    file_name="backup_sistema.json",
+
+    mime="application/json"
+
+)
