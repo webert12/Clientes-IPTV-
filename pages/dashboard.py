@@ -243,3 +243,37 @@ else:
     st.info(
         "Nenhum recebimento registrado."
     )
+# =========================
+# RECEBER PAGAMENTO
+# =========================
+
+st . divisor ()
+st . subheader ( “⚙️ Ações” )
+
+se  clientes :
+
+    nomes  = [ c [ "nome" ] para  c  em  clientes ]
+    sel  =  st . selectbox ( "Cliente ação" , nomes )
+
+    cli  =  próximo ( c  para  c  em  clientes  se  c [ "nome" ] ==  sel )
+
+    se  st . botão ( "💵 Receber pagamento" ):
+
+        cli [ "status" ] =  "Recebido"
+
+        hoje  =  datetime.now ( )
+        ano  =  hoje . ano
+        mes  =  hoje . mês
+
+        Se  hoje for maior  que  10 :
+            mes  +=  1
+            se  mes  >  12 :
+                mes  =  1
+                ano  +=  1
+
+        cli [ "vencimento" ] =  datahora ( ano , mês , 10 ). strftime ( "%d/%m/%Y" )
+
+        ARQ.write_text ( json.dumps ( clientes , indent = 4 , ensure_ascii = False ), encoding = " utf - 8 " )
+
+        st . sucesso ( "Pagamento confirmado" )
+        st.rerun ( )
