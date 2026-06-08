@@ -17,10 +17,10 @@ def converter_valor_seguro(val):
     """Garante que o valor financeiro seja sempre um float válido, evitando quebras (NaN) no dashboard."""
     try:
         if val is None or pd.isna(val):
-            return 25.90
+            return 25.00
         return float(val)
     except:
-        return 25.90
+        return 25.00
 
 # --- CRIAÇÃO AUTOMÁTICA DA TABELA ---
 def inicializar_banco():
@@ -53,7 +53,7 @@ def carregar_clientes():
                     "usuario": str(c.get("usuario", "")),
                     "senha": str(c.get("senha", "")),
                     "status": str(c.get("status", "Pendente")),
-                    "valor": converter_valor_seguro(c.get("valor", 25.90))
+                    "valor": converter_valor_seguro(c.get("valor", 25.00))
                 })
             return lista_limpa
     except Exception as e:
@@ -72,7 +72,7 @@ def salvar_no_banco(lista_clientes):
                     "usuario": str(c.get("usuario", "")).strip(),
                     "senha": str(c.get("senha", "")).strip(),
                     "status": str(c.get("status", "Pendente")).strip(),
-                    "valor": converter_valor_seguro(c.get("valor", 25.90))
+                    "valor": converter_valor_seguro(c.get("valor", 25.00))
                 }
                 sql = text("INSERT INTO clientes (nome, data_json) VALUES (:nome, CAST(:data_json AS JSONB))")
                 conn.execute(sql, {"nome": cliente_sanitizado['nome'], "data_json": json.dumps(cliente_sanitizado)})
@@ -103,7 +103,7 @@ def ao_alterar_tabela():
                 "usuario": nova_linha.get("usuario", ""),
                 "senha": nova_linha.get("senha", ""),
                 "status": nova_linha.get("status", "Pendente"),
-                "valor": converter_valor_seguro(nova_linha.get("valor", 25.90))
+                "valor": converter_valor_seguro(nova_linha.get("valor", 25.00))
             }
             clientes_atuais.append(cliente)
             
@@ -174,6 +174,6 @@ st.data_editor(
             options=["Pendente", "Confirmado"],
             required=True
         ),
-        "valor": st.column_config.NumberColumn("Valor Mensal (R$)", format="R$ %.2f", min_value=0.0, default=25.90)
+        "valor": st.column_config.NumberColumn("Valor Mensal (R$)", format="R$ %.2f", min_value=0.0, default=25.00)
     }
 )
