@@ -1,187 +1,293 @@
 import streamlit as st
 import json
 import pandas as pd
-from sqlalchemy import create_engine, text, exc
+import plotly.express as px
+from pathlib import Path
+from datetime import datetime
 
-# Configuração profissional da página unificada (Sem abas secundárias)
-st.set_page_config(page_title="Dashboard Vision Play TV", page_icon="📊", layout="wide")
-
-@st.cache_resource
-def get_engine():
-    return create_engine(st.secrets["DATABASE_URL"])
-
-engine = get_engine()
-
-# --- FUNÇÃO AUXILIAR DE TRATAMENTO SEGURO DE VALORES (AJUSTADO PARA R$ 25,00) ---
-def converter_valor_seguro(val):
-    """Garante que o valor financeiro seja sempre um float válido baseado na tabela de R$ 25,00."""
-    try:
-        if val is None or pd.isna(val):
-            return 25.00
-        return float(val)
-    except:
-        return 25.00
-
-# --- CRIAÇÃO AUTOMÁTICA DA TABELA E CARGA DEMO ATUALIZADA ---
-def inicializar_banco():
-    try:
-        with engine.begin() as conn:
-            # Garante a existência da estrutura de dados persistente
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS clientes (
-                    id SERIAL PRIMARY KEY,
-                    nome VARCHAR(255),
-                    data_json JSONB
-                );
-            """))
-            
-            # SE O BANCO ESTIVER VAZIO: Popula com os novos valores de R$ 25,00 para demonstração imediata
-            total_registros = conn.execute(text("SELECT COUNT(*) FROM clientes")).scalar()
-            if total_registros == 0:
-                clientes_demonstracao = [
-                    {"nome": "Carlos Andrade", "usuario": "carlos.vision", "senha": "abc123", "status": "Confirmado", "valor": 25.00},
-                    {"nome": "Mariana Costa", "usuario": "mari.play", "senha": "xyz456", "status": "Pendente", "valor": 25.00},
-                    {"nome": "Felipe Melo", "usuario": "felipe.tv", "senha": "tv789", "status": "Confirmado", "valor": 25.00},
-                    {"nome": "Ana Beatriz", "usuario": "ana.vision", "senha": "vision99", "status": "Pendente", "valor": 25.00}
-                ]
-                for c in clientes_demonstracao:
-                    sql = text("INSERT INTO clientes (nome, data_json) VALUES (:nome, CAST(:data_json AS JSONB))")
-                    conn.execute(sql, {"nome": c['nome'], "data_json": json.dumps(c)})
-                    
-    except Exception as e:
-        st.error(f"⚠️ Erro crítico ao criar a estrutura do banco de dados: {e}")
-
-inicializar_banco()
-
-# --- CARREGAR DADOS DO BANCO ---
-def carregar_clientes():
-    try:
-        with engine.connect() as conn:
-            result = conn.execute(text("SELECT data_json FROM clientes ORDER BY id ASC")).fetchall()
-            clientes = [r[0] if isinstance(r[0], dict) else json.loads(r[0]) for r in result]
-            
-            lista_limpa = []
-            for c in clientes:
-                lista_limpa.append({
-                    "nome": str(c.get("nome", "Sem Nome")),
-                    "usuario": str(c.get("usuario", "")),
-                    "senha": str(c.get("senha", "")),
-                    "status": str(c.get("status", "Pendente")),
-                    "valor": converter_valor_seguro(c.get("valor", 25.00))
-                })
-            return lista_limpa
-    except Exception as e:
-        st.error(f"⚠️ Erro ao carregar dados do banco: {e}")
-        return []
-
-# --- SALVAR DADOS NO BANCO ---
-def salvar_no_banco(lista_clientes):
-    try:
-        with engine.begin() as conn:
-            conn.execute(text("DELETE FROM clientes"))
-            for c in lista_clientes:
-                cliente_sanitizado = {
-                    "nome": str(c.get("nome", "Novo Cliente")).strip(),
-                    "usuario": str(c.get("usuario", "")).strip(),
-                    "senha": str(c.get("senha", "")).strip(),
-                    "status": str(c.get("status", "Pendente")).strip(),
-                    "valor": converter_valor_seguro(c.get("valor", 25.00))
-                }
-                sql = text("INSERT INTO clientes (nome, data_json) VALUES (:nome, CAST(:data_json AS JSONB))")
-                conn.execute(sql, {"nome": cliente_sanitizado['nome'], "data_json": json.dumps(cliente_sanitizado)})
-    except exc.SQLAlchemyError as e:
-        st.error(f"Erro ao salvar alterações no banco: {e}")
-
-# --- CONTROLE DE SESSÃO REATIVA ---
-if 'clientes' not in st.session_state:
-    st.session_state.clientes = carregar_clientes()
-
-# --- CALLBACK DE ATUALIZAÇÃO E RENOVAÇÃO EM TEMPO REAL ---
-def ao_alterar_tabela():
-    estado_editor = st.session_state.editor_principal
-    clientes_atuais = list(st.session_state.clientes)
-    
-    # 1. Tratar alterações de status ou valores direto no Dashboard
-    if "edited_rows" in estado_editor:
-        for idx, mudancas in estado_editor["edited_rows"].items():
-            idx_int = int(idx)
-            if idx_int < len(clientes_atuais):
-                clientes_atuais[idx_int].update(mudancas)
-                
-    # 2. Tratar inserção rápida de novos clientes
-    if "added_rows" in estado_editor:
-        for nova_linha in estado_editor["added_rows"]:
-            cliente = {
-                "nome": nova_linha.get("nome", "Novo Cliente"),
-                "usuario": nova_linha.get("usuario", ""),
-                "senha": nova_linha.get("senha", ""),
-                "status": nova_linha.get("status", "Pendente"),
-                "valor": converter_valor_seguro(nova_linha.get("valor", 25.00))
-            }
-            clientes_atuais.append(cliente)
-            
-    # 3. Tratar remoções diretas
-    if "deleted_rows" in estado_editor:
-        for idx in sorted([int(i) for i in estado_editor["deleted_rows"]], reverse=True):
-            if idx < len(clientes_atuais):
-                clientes_atuais.pop(idx)
-                
-    # Salva e sincroniza a sessão com o banco de dados de maneira limpa
-    st.session_state.clientes = clientes_atuais
-    salvar_no_banco(clientes_atuais)
-
-# --- ENGINE DE CÁLCULO MÓVEL DO DASHBOARD ---
-total_clientes = len(st.session_state.clientes)
-previsto = sum(converter_valor_seguro(c.get('valor')) for c in st.session_state.clientes)
-recebido = sum(converter_valor_seguro(c.get('valor')) for c in st.session_state.clientes 
-               if str(c.get('status', '')).strip().lower() == 'confirmado')
-pendente = previsto - recebido
-
-# --- LAYOUT VISUAL DO DASHBOARD ---
 st.title("📊 Dashboard Vision Play TV")
 
-# Métricas Gerenciais Atualizadas Instantaneamente
-col1, col2, col3, col4 = st.columns(4)
-with col1:
-    st.metric("👥 Total de Clientes", f"{total_clientes}")
-with col2:
-    st.metric("💰 Faturamento Previsto", f"R$ {previsto:.2f}")
-with col3:
-    st.metric("✅ Total Recebido", f"R$ {recebido:.2f}")
-with col4:
-    st.metric("⚠️ Valor Pendente", f"R$ {pendente:.2f}")
+ARQ_CLIENTES = Path("clientes.json")
+ARQ_HISTORICO = Path("historico.json")
+
+if not ARQ_CLIENTES.exists():
+    ARQ_CLIENTES.write_text("[]", encoding="utf-8")
+
+if not ARQ_HISTORICO.exists():
+    ARQ_HISTORICO.write_text("[]", encoding="utf-8")
+
+clientes = json.loads(
+    ARQ_CLIENTES.read_text(encoding="utf-8")
+)
+
+historico = json.loads(
+    ARQ_HISTORICO.read_text(encoding="utf-8")
+)
+
+hoje = datetime.now().date()
+
+total_clientes = len(clientes)
+
+em_dia = 0
+vencendo = 0
+vencidos = 0
+
+receita_prevista = 0
+receita_recebida = 0
+
+for cliente in clientes:
+    valor = float(cliente.get("valor", 0))
+    receita_prevista += valor
+
+    try:
+        vencimento = datetime.strptime(
+            cliente["vencimento"],
+            "%d/%m/%Y"
+        ).date()
+
+        dias = (vencimento - hoje).days
+
+        if dias < 0:
+            vencidos += 1
+        elif dias <= 2:
+            vencendo += 1
+        else:
+            em_dia += 1
+    except:
+        pass
+
+for item in historico:
+    receita_recebida += float(
+        item.get("valor", 0)
+    )
+
+receita_pendente = (
+    receita_prevista - receita_recebida
+)
+
+# ==========================
+# CARDS
+# ==========================
+
+c1, c2, c3, c4 = st.columns(4)
+
+c1.metric(
+    "👥 Clientes",
+    total_clientes
+)
+
+c2.metric(
+    "💰 Previsto",
+    f"R$ {receita_prevista:.2f}"
+)
+
+c3.metric(
+    "✅ Recebido",
+    f"R$ {receita_recebida:.2f}"
+)
+
+c4.metric(
+    "⚠️ Pendente",
+    f"R$ {receita_pendente:.2f}"
+)
 
 st.divider()
 
-# --- ÁREA DE GERENCIAMENTO INTEGRADA AO DASHBOARD (RENOVAÇÃO DIRETA AQUI) ---
-st.subheader("👥 Gerenciamento e Renovação de Clientes")
+# ==========================
+# GRÁFICOS
+# ==========================
 
-if not st.session_state.clientes:
-    df = pd.DataFrame(columns=["nome", "usuario", "senha", "status", "valor"])
+col1, col2 = st.columns(2)
+
+with col1:
+    df_status = pd.DataFrame({
+        "Status": [
+            "Em Dia",
+            "Vencendo",
+            "Vencidos"
+        ],
+        "Quantidade": [
+            em_dia,
+            vencendo,
+            vencidos
+        ]
+    })
+
+    fig = px.pie(
+        df_status,
+        names="Status",
+        values="Quantidade",
+        title="Clientes"
+    )
+
+    st.plotly_chart(
+        fig,
+        use_container_width=True
+    )
+
+with col2:
+    df_financeiro = pd.DataFrame({
+        "Tipo": [
+            "Recebido",
+            "Pendente"
+        ],
+        "Valor": [
+            receita_recebida,
+            receita_pendente
+        ]
+    })
+
+    fig2 = px.pie(
+        df_financeiro,
+        names="Tipo",
+        values="Valor",
+        title="Financeiro"
+    )
+
+    st.plotly_chart(
+        fig2,
+        use_container_width=True
+    )
+
+st.divider()
+
+# ==========================
+# CLIENTES VENCENDO
+# ==========================
+
+st.subheader("⚠️ Clientes Próximos do Vencimento")
+
+alertas = []
+
+for cliente in clientes:
+    try:
+        vencimento = datetime.strptime(
+            cliente["vencimento"],
+            "%d/%m/%Y"
+        ).date()
+
+        dias = (
+            vencimento - hoje
+        ).days
+
+        if dias <= 2:
+            alertas.append({
+                "Nome": cliente["nome"],
+                "WhatsApp": cliente["whatsapp"],
+                "Vencimento": cliente["vencimento"]
+            })
+    except:
+        pass
+
+if alertas:
+    st.dataframe(
+        pd.DataFrame(alertas),
+        use_container_width=True,
+        hide_index=True
+    )
 else:
-    df = pd.DataFrame(st.session_state.clientes)
-    for col in ["nome", "usuario", "senha", "status", "valor"]:
-        if col not in df.columns:
-            df[col] = ""
-    df = df[["nome", "usuario", "senha", "status", "valor"]]
+    st.success(
+        "Nenhum cliente próximo do vencimento."
+    )
 
-# Interface Avançada de Entrada de Dados Interativa
-st.data_editor(
-    df,
-    key="editor_principal",
-    on_change=ao_alterar_tabela,
-    use_container_width=True,
-    hide_index=True,
-    num_rows="dynamic",
-    column_config={
-        "nome": st.column_config.TextColumn("Nome do Cliente", required=True),
-        "usuario": st.column_config.TextColumn("Usuário de Acesso", required=True),
-        "senha": st.column_config.TextColumn("Senha", required=True),
-        "status": st.column_config.SelectboxColumn(
-            "Status do Pagamento",
-            options=["Pendente", "Confirmado"],
-            required=True
-        ),
-        "valor": st.column_config.NumberColumn("Valor Mensal (R$)", format="R$ %.2f", min_value=0.0, default=25.00)
-    }
+st.divider()
+
+# =========================
+# RECEBER PAGAMENTO
+# =========================
+
+st.divider()
+st.subheader("⚙️ Ações")
+
+if clientes:
+    nomes = [c["nome"] for c in clientes]
+    sel = st.selectbox("Cliente ação", nomes)
+
+    cli = next(c for c in clientes if c["nome"] == sel)
+
+    if st.button("💵 Receber pagamento"):
+        cli["status"] = "Recebido"
+
+        agora = datetime.now()
+        ano = agora.year
+        mes = agora.month
+
+        # Se passou do dia 10, joga o vencimento para o mês seguinte
+        if agora.day > 10:
+            mes += 1
+            if mes > 12:
+                mes = 1
+                ano += 1
+
+        cli["vencimento"] = datetime(ano, mes, 10).strftime("%d/%m/%Y")
+
+        # Salva o cliente com a nova data de vencimento
+        ARQ_CLIENTES.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
+
+        # Salva o recebimento no histórico para atualizar o gráfico financeiro
+        novo_recebimento = {
+            "cliente": cli["nome"],
+            "valor": float(cli.get("valor", 25.00)),
+            "data": agora.strftime("%d/%m/%Y %H:%M")
+        }
+        historico.append(novo_recebimento)
+        ARQ_HISTORICO.write_text(json.dumps(historico, indent=4, ensure_ascii=False), encoding="utf-8")
+
+        st.success("Pagamento confirmado!")
+        st.rerun()
+
+
+# ==========================
+# ÚLTIMOS RECEBIMENTOS
+# ==========================
+
+st.subheader("💵 Últimos Recebimentos")
+
+if historico:
+    ultimos = list(
+        reversed(historico)
+    )[:10]
+
+    st.dataframe(
+        pd.DataFrame(ultimos),
+        use_container_width=True,
+        hide_index=True
+    )
+else:
+    st.info(
+        "Nenhum recebimento registrado."
+    )
+
+# ======================================
+# EXPORTAÇÃO GERAL
+# ======================================
+
+st.subheader(
+    "📥 Backup Geral"
+)
+
+backup = {
+
+    "clientes": clientes,
+    "historico": historico,
+    "exportado_em": datetime.now().strftime(
+        "%d/%m/%Y %H:%M:%S"
+    )
+
+}
+
+st.download_button(
+
+    "📦 Baixar Backup JSON",
+
+    data=json.dumps(
+        backup,
+        indent=4,
+        ensure_ascii=False
+    ),
+
+    file_name="backup_sistema.json",
+
+    mime="application/json"
+
 )
