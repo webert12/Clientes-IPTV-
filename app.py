@@ -88,7 +88,7 @@ def ao_alterar_tabela():
     estado_editor = st.session_state.editor_principal
     clientes_atuais = list(st.session_state.clientes)
     
-    # 1. Tratar edições de linhas existentes
+    # 1. Tratar edições de linhas existentes (Mudança de status, preço, nome...)
     if "edited_rows" in estado_editor:
         for idx, mudancas in estado_editor["edited_rows"].items():
             idx_int = int(idx)
@@ -117,10 +117,11 @@ def ao_alterar_tabela():
     st.session_state.clientes = clientes_atuais
     salvar_no_banco(clientes_atuais)
     
-    # CRUCIAL: Força o Streamlit a reconstruir a árvore visual recalculando os Cards de imediato
-    st.rerun()
+    # NOTA PROFISSIONAL: st.rerun() removido daqui. 
+    # O Streamlit executará o recarregamento nativo imediatamente ao fechar este callback,
+    # garantindo sincronização perfeita e instantânea dos valores do painel financeiro.
 
-# --- CÁLCULO SEGURO DOS CARD FINANCEIROS ---
+# --- CÁLCULO SEGURO DOS CARDS FINANCEIROS ---
 total_clientes = len(st.session_state.clientes)
 previsto = sum(converter_valor_seguro(c.get('valor')) for c in st.session_state.clientes)
 recebido = sum(converter_valor_seguro(c.get('valor')) for c in st.session_state.clientes 
@@ -130,7 +131,7 @@ pendente = previsto - recebido
 # --- LAYOUT DA TELA ---
 st.title("📊 Dashboard Vision Play TV")
 
-# Exibição profissional em colunas paralelas para visualização gerencial clara
+# Exibição limpa em colunas paralelas para apelo visual profissional
 col1, col2, col3, col4 = st.columns(4)
 with col1:
     st.metric("👥 Total de Clientes", f"{total_clientes}")
@@ -146,12 +147,12 @@ st.divider()
 # --- TABELA DE GERENCIAMENTO CENTRALIZADA ---
 st.subheader("👥 Gerenciamento de Clientes")
 
-# Criação do DataFrame com proteção contra dados faltantes
+# Criação do DataFrame com proteção analítica contra dados faltantes
 if not st.session_state.clientes:
     df = pd.DataFrame(columns=["nome", "usuario", "senha", "status", "valor"])
 else:
     df = pd.DataFrame(st.session_state.clientes)
-    # Garante a integridade das colunas mesmo em estruturas recém-criadas
+    # Garante a integridade técnica das colunas exibidas
     for col in ["nome", "usuario", "senha", "status", "valor"]:
         if col not in df.columns:
             df[col] = ""
