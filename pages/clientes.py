@@ -329,39 +329,3 @@ if clientes:
 
         st.success("Atualizado")
         st.rerun()
-
-
-# =========================
-# RECEBER PAGAMENTO
-# =========================
-
-st.divider()
-st.subheader("⚙️ Ações")
-
-if clientes:
-
-    nomes = [c["nome"] for c in clientes]
-    sel = st.selectbox("Cliente ação", nomes)
-
-    cli = next(c for c in clientes if c["nome"] == sel)
-
-    if st.button("💵 Receber pagamento"):
-
-        cli["status"] = "Recebido"
-
-        hoje = datetime.now()
-        ano = hoje.year
-        mes = hoje.month
-
-        if hoje.day > 10:
-            mes += 1
-            if mes > 12:
-                mes = 1
-                ano += 1
-
-        cli["vencimento"] = datetime(ano, mes, 10).strftime("%d/%m/%Y")
-
-        ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
-
-        st.success("Pagamento confirmado")
-        st.rerun()
