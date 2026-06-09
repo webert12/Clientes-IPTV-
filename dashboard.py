@@ -8,7 +8,8 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
 
-st.title("📊 Dashboard Vision Play TV")
+# Configuração da página (deve ser o primeiro comando Streamlit)
+st.set_page_config(page_title="Vision Play TV", page_icon="📊", layout="wide")
 
 # Configuração do Fuso Horário de Brasília
 CORRETO_FUSO = ZoneInfo("America/Sao_Paulo")
@@ -80,77 +81,86 @@ if "logado" not in st.session_state:
     st.session_state["usuario_nome"] = ""
     st.session_state["usuario_role"] = ""
 
+# SE NÃO ESTIVER LOGADO, MOSTRA APENAS A TELA DE LOGIN CENTRALIZADA E PARA A EXECUÇÃO
 if not st.session_state["logado"]:
-    st.sidebar.markdown("### 🔒 Autenticação Exigida")
-    with st.form("form_login"):
-        st.subheader("🔑 Acessar o Sistema")
-        user_input = st.text_input("Usuário:").strip()
-        pass_input = st.text_input("Senha:", type="password").strip()
-        btn_login = st.form_submit_button("Entrar no Sistema")
-        
-        if btn_login:
-            with engine.connect() as conn:
-                usuario_banco = conn.execute(
-                    text("SELECT username, password, role FROM vision_usuarios WHERE username = :u"),
-                    {"u": user_input}
-                ).fetchone()
-                
-                if usuario_banco and usuario_banco[1] == pass_input:
-                    st.session_state["logado"] = True
-                    st.session_state["usuario_nome"] = usuario_banco[0]
-                    st.session_state["usuario_role"] = usuario_banco[1] if usuario_banco[2] == "ADM" else "USER"
-                    st.success("Acesso autorizado! Carregando...")
-                    st.rerun()
-                else:
-                    st.error("Usuário ou senha incorretos.")
-    st.info("💡 Primeiro acesso? Use o usuário 'admin' e senha 'admin123'.")
-    st.stop()
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("<br><br><br>", unsafe_allow_html=True)
+        with st.form("form_login", clear_on_submit=False):
+            st.markdown("<h2 style='text-align: center;'>🔒 Vision Play TV</h2>", unsafe_allow_html=True)
+            st.markdown("<p style='text-align: center; color: gray;'>Insira suas credenciais para acessar o painel</p>", unsafe_allow_html=True)
+            
+            user_input = st.text_input("Usuário:").strip().lower()
+            pass_input = st.text_input("Senha:", type="password").strip()
+            btn_login = st.form_submit_button("Entrar no Sistema", use_container_width=True)
+            
+            if btn_login:
+                with engine.connect() as conn:
+                    usuario_banco = conn.execute(
+                        text("SELECT username, password, role FROM vision_usuarios WHERE username = :u"),
+                        {"u": user_input}
+                    ).fetchone()
+                    
+                    if usuario_banco and usuario_banco[1] == pass_input:
+                        st.session_state["logado"] = True
+                        st.session_state["usuario_nome"] = usuario_banco[0]
+                        st.session_state["usuario_role"] = "ADM" if usuario_banco[2] == "ADM" else "USER"
+                        st.rerun()
+                    else:
+                        st.error("Usuário ou senha incorretos.")
+        st.markdown("<p style='text-align: center; font-size: 12px; color: #888;'>💡 Administrador padrão: admin / admin123</p>", unsafe_allow_html=True)
+    st.stop()  # Impede completamente a renderização do restante do script
+
+# ==============================================================================
+# SE CHEGOU AQUI, O USUÁRIO ESTÁ LOGADO. O SISTEMA SERÁ EXIBIDO ABAIXO:
+# ==============================================================================
+
+st.title("📊 Dashboard Vision Play TV")
 
 # Menu Lateral de Identificação e Logout
 st.sidebar.markdown(f"👤 **Usuário:** `{st.session_state['usuario_nome']}`")
 st.sidebar.markdown(f"🎖️ **Nível:** `{st.session_state['usuario_role']}`")
-if st.sidebar.button("🚪 Sair / Desconectar"):
+
+# ======================================
+# CAIXA POP-UP DE DIÁLOGO PARA LIMPEZA
+# ======================================
+@st.dialog("🧹 Escolha o Período para Limpar")
+def abrir_popup_limpeza():
+    st.write("Selecione ou digite o **Dia/Mês** dos recebimentos que deseja deletar permanentemente do histórico.")
+    data_limpar = st.text_input("Data desejada (Exemplo: 10/06 ou apenas /06 para o mês todo):", value=hoje.strftime("%d/%m"))
+    
+    st.warning("⚠️ Esta ação vai apagar o faturamento correspondente ao período informado e atualizar os gráficos na hora!")
+    
+    if st.button("🔥 Confirmar e Zerar Agora", use_container_width=True):
+        if not data_limpar.strip():
+            st.error("Insira um critério de data válido para prosseguir.")
+        else:
+            with engine.begin() as conn:
+                if st.session_state["usuario_role"] == "ADM":
+                    # ADM limpa registros globais que batem com o padrão digitado
+                    conn.execute(text("DELETE FROM vision_historico WHERE data LIKE :padrao"), {"padrao": f"%{data_limpar.strip()}%"})
+                else:
+                    # Usuário comum só apaga os dados pertencentes a ele
+                    conn.execute(text("""
+                        DELETE FROM vision_historico 
+                        WHERE data LIKE :padrao AND usuario_owner = :owner
+                    """), {"padrao": f"%{data_limpar.strip()}%", "owner": st.session_state["usuario_nome"]})
+            
+            st.toast("Histórico atualizado com sucesso!", icon="✅")
+            st.rerun()
+
+# Botões de controle no topo da barra lateral
+if st.sidebar.button("🔄 Sincronizar Banco de Dados", use_container_width=True):
+    st.rerun()
+
+if st.sidebar.button("🧹 Zerar Lançamentos por Data", use_container_width=True):
+    abrir_popup_limpeza()
+
+if st.sidebar.button("🚪 Sair / Desconectar", use_container_width=True):
     st.session_state["logado"] = False
     st.session_state["usuario_nome"] = ""
     st.session_state["usuario_role"] = ""
     st.rerun()
-
-# ======================================
-# CAIXA POP-UP DE DIÁLOGO PARA LIMPEZA (NOVA)
-# ======================================
-@st.dialog("🧹 Escolha o Período para Limpar")
-def abrir_popup_limpeza():
-    st.write("Digite o **Dia/Mês** ou o padrão de data dos recebimentos que deseja deletar do histórico.")
-    data_limpar = st.text_input("Data desejada (Exemplo: 10/06 ou apenas /06 para o mês todo):", value=hoje.strftime("%d/%m"))
-    
-    st.warning("⚠️ Esta ação vai zerar as finanças do período digitado. Seus clientes continuarão cadastrados intactos.")
-    
-    if st.button("🔥 Confirmar e Zerar Agora", use_container_width=True):
-        if not data_limpar.strip():
-            st.error("Insira uma data válida para prosseguir.")
-        else:
-            with engine.begin() as conn:
-                if st.session_state["usuario_role"] == "ADM":
-                    # ADM limpa globalmente se quiser
-                    conn.execute(text("DELETE FROM vision_historico WHERE data LIKE :padrao"), {"padrao": f"%{data_limpar}%"})
-                else:
-                    # Usuário comum só apaga os dados dele
-                    conn.execute(text("""
-                        DELETE FROM vision_historico 
-                        WHERE data LIKE :padrao AND usuario_owner = :owner
-                    """), {"padrao": f"%{data_limpar}%", "owner": st.session_state["usuario_nome"]})
-            
-            st.success("Histórico limpo com sucesso!")
-            st.cache_resource.clear()
-            st.rerun()
-
-# Botões de controle no topo da barra lateral
-if st.sidebar.button("🔄 Sincronizar Banco de Dados"):
-    st.cache_resource.clear()
-    st.rerun()
-
-if st.sidebar.button("🧹 Zerar Lançamentos por Data"):
-    abrir_popup_limpeza()
 
 # ======================================
 # CARREGAMENTO FILTRADO POR USUÁRIO (MULTI-TENANCY)
@@ -272,7 +282,6 @@ with abas[0]:
                              {"cliente": cli["nome"], "valor": valor_pago, "data": data_historico, "owner": st.session_state["usuario_nome"]})
 
             st.success(f"Pagamento de R$ {valor_pago:.2f} processado com sucesso!")
-            st.cache_resource.clear()
             st.rerun()
     else:
         st.info("Nenhum cliente disponível.")
@@ -303,7 +312,6 @@ with abas[1]:
                             "status": novo_status, "valor": novo_valor, "telas": int(novo_telas), "owner": st.session_state["usuario_nome"]
                         })
                     st.success(f"Cliente cadastrado com sucesso!")
-                    st.cache_resource.clear()
                     st.rerun()
                 except:
                     st.error("Erro: Já existe um cliente com este nome cadastrado.")
@@ -330,15 +338,13 @@ with abas[2]:
                 with engine.begin() as conn:
                     conn.execute(text("UPDATE vision_clientes SET whatsapp = :w, vencimento = :v, status = :s, valor = :val, telas = :t WHERE nome = :n"),
                                  {"w": edit_whatsapp, "v": edit_vencimento, "s": edit_status, "val": edit_valor, "t": int(edit_telas), "n": cli_edit["nome"]})
-                st.success("Dados atualizados na nuvem!")
-                st.cache_resource.clear()
+                st.success("Dados updated na nuvem!")
                 st.rerun()
                 
             if btn_deletar:
                 with engine.begin() as conn:
                     conn.execute(text("DELETE FROM vision_clientes WHERE nome = :nome"), {"nome": cli_edit["nome"]})
                 st.success("Cliente removido permanentemente.")
-                st.cache_resource.clear()
                 st.rerun()
     else:
         st.info("Nenhum cliente cadastrado.")
