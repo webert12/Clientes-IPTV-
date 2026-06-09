@@ -171,24 +171,19 @@ st.sidebar.divider()
 # CAIXA POP-UP DE LIMPEZA COM FILTRO DE ISOLAMENTO POR USUÁRIO
 @st.dialog("🧹 Escolha o Período para Limpar")
 def abrir_popup_limpeza():
-    st.write("Digite o **Dia/Mês** dos recebimentos que deseja deletar do histórico.")
+    st.write("Digite o **Dia/Mês** dos recebimentos que deseja deletar do seu histórico.")
     data_limpar = st.text_input("Data desejada (Ex: 10/06 ou /06):", value=hoje.strftime("%d/%m"), key=f"inp_clean_{usuario_atual}")
     
-    if role_atual == "ADM":
-        st.warning("⚠️ Você está logado como ADM. Isso apagará os dados globais do período digitado!")
-    else:
-        st.warning("⚠️ Isso apagará apenas os **seus** registros de recebimento do período digitado!")
+    st.warning("⚠️ Isso apagará apenas os **seus** registros de recebimento do período digitado!")
 
     if st.button("🔥 Confirmar e Zerar Agora", use_container_width=True, key=f"btn_clean_exec_{usuario_atual}"):
         if data_limpar.strip():
             with engine.begin() as conn:
-                if role_atual == "ADM":
-                    conn.execute(text("DELETE FROM vision_historico WHERE data LIKE :padrao"), {"padrao": f"%{data_limpar.strip()}%"})
-                else:
-                    conn.execute(text("""
-                        DELETE FROM vision_historico 
-                        WHERE data LIKE :padrao AND TRIM(LOWER(usuario_owner)) = TRIM(LOWER(:owner))
-                    """), {"padrao": f"%{data_limpar.strip()}%", "owner": usuario_atual})
+                # Isolamento aplicado na exclusão também!
+                conn.execute(text("""
+                    DELETE FROM vision_historico 
+                    WHERE data LIKE :padrao AND TRIM(LOWER(usuario_owner)) = TRIM(LOWER(:owner))
+                """), {"padrao": f"%{data_limpar.strip()}%", "owner": usuario_atual})
             st.rerun()
 
 # --- BOTÕES DA BARRA LATERAL ---
@@ -210,24 +205,23 @@ if st.sidebar.button("🚪 Sair / Desconectar", use_container_width=True, key=f"
 # ======================================
 def carregar_dados_supabase():
     with engine.connect() as conn:
-        if role_atual == "ADM":
-            res_clientes = conn.execute(text("SELECT nome, whatsapp, vencimento, status, valor, telas FROM vision_clientes ORDER BY nome")).fetchall()
-            res_historico = conn.execute(text("SELECT cliente, valor, data FROM vision_historico ORDER BY id ASC")).fetchall()
-        else:
-            # Filtro e isolamento absoluto via banco de dados
-            res_clientes = conn.execute(text("""
-                SELECT nome, whatsapp, vencimento, status, valor, telas 
-                FROM vision_clientes 
-                WHERE TRIM(LOWER(usuario_owner)) = TRIM(LOWER(:u)) 
-                ORDER BY nome
-            """), {"u": usuario_atual}).fetchall()
-            
-            res_historico = conn.execute(text("""
-                SELECT cliente, valor, data 
-                FROM vision_historico 
-                WHERE TRIM(LOWER(usuario_owner)) = TRIM(LOWER(:u)) 
-                ORDER BY id ASC
-            """), {"u": usuario_atual}).fetchall()
+        # AQUI ESTÁ A MÁGICA DO PAINEL VIRGEM:
+        # Todos os usuários (USER ou ADM) passam obrigatoriamente por este filtro,
+        # trazendo SOMENTE os clientes cujo "usuario_owner" seja igual ao login atual.
+        
+        res_clientes = conn.execute(text("""
+            SELECT nome, whatsapp, vencimento, status, valor, telas 
+            FROM vision_clientes 
+            WHERE TRIM(LOWER(usuario_owner)) = TRIM(LOWER(:u)) 
+            ORDER BY nome
+        """), {"u": usuario_atual}).fetchall()
+        
+        res_historico = conn.execute(text("""
+            SELECT cliente, valor, data 
+            FROM vision_historico 
+            WHERE TRIM(LOWER(usuario_owner)) = TRIM(LOWER(:u)) 
+            ORDER BY id ASC
+        """), {"u": usuario_atual}).fetchall()
         
         lista_clientes = [{"nome": r[0], "whatsapp": r[1], "vencimento": r[2], "status": r[3], "valor": float(r[4] or 0), "telas": int(r[5] or 1)} for r in res_clientes]
         lista_historico = [{"cliente": r[0], "valor": float(r[1] or 0), "data": r[2]} for r in res_historico]
@@ -260,7 +254,7 @@ for item in historico:
 receita_pendente = receita_prevista - receita_recebida
 
 c1, c2, c3, c4 = st.columns(4)
-c1.metric("👥 Clientes", total_clientes)
+c1.metric("👥 Seus Clientes", total_clientes)
 c2.metric("💰 Previsto", f"R$ {receita_prevista:.2f}")
 c3.metric("✅ Recebido", f"R$ {receita_recebida:.2f}")
 c4.metric("⚠️ Pendente", f"R$ {receita_pendente:.2f}")
@@ -270,10 +264,10 @@ st.divider()
 col1, col2 = st.columns(2)
 with col1:
     df_status = pd.DataFrame({"Status": ["Em Dia", "Vencendo", "Vencidos"], "Quantidade": [em_dia, vencendo, vencidos]})
-    st.plotly_chart(px.pie(df_status, names="Status", values="Quantidade", title="Clientes"), use_container_width=True)
+    st.plotly_chart(px.pie(df_status, names="Status", values="Quantidade", title="Seus Clientes"), use_container_width=True)
 with col2:
     df_financeiro = pd.DataFrame({"Tipo": ["Recebido", "Pendente"], "Valor": [receita_recebida, receita_pendente]})
-    st.plotly_chart(px.pie(df_financeiro, names="Tipo", values="Valor", title="Financeiro"), use_container_width=True)
+    st.plotly_chart(px.pie(df_financeiro, names="Tipo", values="Valor", title="Seu Financeiro"), use_container_width=True)
 
 st.divider()
 
@@ -308,14 +302,14 @@ with abas[0]:
             data_historico = agora.strftime("%d/%m/%Y %H:%M")
 
             with engine.begin() as conn:
-                conn.execute(text("UPDATE vision_clientes SET status = 'Recebido', vencimento = :vencimento WHERE nome = :nome"), {"vencimento": novo_vencimento, "nome": cli["nome"]})
+                conn.execute(text("UPDATE vision_clientes SET status = 'Recebido', vencimento = :vencimento WHERE nome = :nome AND TRIM(LOWER(usuario_owner)) = :owner"), {"vencimento": novo_vencimento, "nome": cli["nome"], "owner": usuario_atual})
                 conn.execute(text("INSERT INTO vision_historico (cliente, valor, data, usuario_owner) VALUES (:cliente, :valor, :data, :owner)"), 
                              {"cliente": cli["nome"], "valor": valor_pago, "data": data_historico, "owner": usuario_atual})
 
             st.success(f"Pagamento processado com sucesso!")
             st.rerun()
     else:
-        st.info("Nenhum cliente disponível.")
+        st.info("Você ainda não tem clientes cadastrados.")
 
 # ABA 2: CADASTRAR NOVO CLIENTE
 with abas[1]:
@@ -345,7 +339,7 @@ with abas[1]:
                     st.success(f"Cliente cadastrado com sucesso!")
                     st.rerun()
                 except:
-                    st.error("Erro: Já existe um cliente com este nome cadastrado.")
+                    st.error("Erro: Já existe um cliente com este nome cadastrado no banco global.")
 
 # ABA 3: EDITAR OU DELETAR CLIENTE
 with abas[2]:
@@ -363,22 +357,22 @@ with abas[2]:
             
             c_b1, c_b2 = st.columns(2)
             with c_b1: btn_atualizar = st.form_submit_button("💾 Salvar Alterações")
-            with c_b2: btn_deletar = st.form_submit_button("🚨 EXCLUIR CLIENTE DO BANCO")
+            with c_b2: btn_deletar = st.form_submit_button("🚨 EXCLUIR CLIENTE")
             
             if btn_atualizar:
                 with engine.begin() as conn:
-                    conn.execute(text("UPDATE vision_clientes SET whatsapp = :w, vencimento = :v, status = :s, valor = :val, telas = :t WHERE nome = :n"),
-                                 {"w": edit_whatsapp, "v": edit_vencimento, "s": edit_status, "val": edit_valor, "t": int(edit_telas), "n": cli_edit["nome"]})
+                    conn.execute(text("UPDATE vision_clientes SET whatsapp = :w, vencimento = :v, status = :s, valor = :val, telas = :t WHERE nome = :n AND TRIM(LOWER(usuario_owner)) = :owner"),
+                                 {"w": edit_whatsapp, "v": edit_vencimento, "s": edit_status, "val": edit_valor, "t": int(edit_telas), "n": cli_edit["nome"], "owner": usuario_atual})
                 st.success("Dados atualizados na nuvem!")
                 st.rerun()
                 
             if btn_deletar:
                 with engine.begin() as conn:
-                    conn.execute(text("DELETE FROM vision_clientes WHERE nome = :nome"), {"nome": cli_edit["nome"]})
+                    conn.execute(text("DELETE FROM vision_clientes WHERE nome = :nome AND TRIM(LOWER(usuario_owner)) = :owner"), {"nome": cli_edit["nome"], "owner": usuario_atual})
                 st.success("Cliente removido permanentemente.")
                 st.rerun()
     else:
-        st.info("Nenhum cliente cadastrado.")
+        st.info("Você ainda não tem clientes cadastrados.")
 
 # ABA 4 EXCLUSIVA: GERENCIAR USUÁRIOS (SÓ APARECE PARA ADM)
 if role_atual == "ADM":
@@ -480,12 +474,12 @@ if role_atual == "ADM":
 
 # Listagem de Últimos Recebimentos
 st.divider()
-st.subheader("💵 Últimos Recebimentos")
+st.subheader("💵 Seus Últimos Recebimentos")
 if historico:
     st.dataframe(pd.DataFrame(list(reversed(historico))[:10]), use_container_width=True, hide_index=True)
 else:
-    st.info("Nenhum recebimento registrado.")
+    st.info("Você ainda não possui recebimentos registrados.")
 
 # Seção de Backup Geral
-st.subheader("📥 Backup Geral")
-st.download_button("📦 Baixar Backup JSON", data=json.dumps({"clientes": clientes, "historico": historico, "exportado_em": datetime.now(CORRETO_FUSO).strftime("%d/%m/%Y %H:%M:%S")}, indent=4, ensure_ascii=False), file_name="backup_sistema.json", mime="application/json", key=f"btn_bkp_{usuario_atual}")
+st.subheader("📥 Backup Pessoal")
+st.download_button("📦 Baixar Seus Dados em JSON", data=json.dumps({"clientes": clientes, "historico": historico, "exportado_em": datetime.now(CORRETO_FUSO).strftime("%d/%m/%Y %H:%M:%S")}, indent=4, ensure_ascii=False), file_name=f"backup_{usuario_atual}.json", mime="application/json", key=f"btn_bkp_{usuario_atual}")
