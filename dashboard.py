@@ -233,10 +233,12 @@ else:
 st.divider()
 st.subheader("⚙️ Gerenciamento do Sistema (Ações em Tempo Real)")
 
-tab_pagamento, tab_cadastro, tab_editar = st.tabs([
+# Adicionada a quarta aba "🧹 Limpeza Mensal" na lista abaixo
+tab_pagamento, tab_cadastro, tab_editar, tab_limpeza = st.tabs([
     "💵 Registrar Pagamento", 
     "➕ Cadastrar Novo Cliente", 
-    "✏️ Editar / Excluir Cliente"
+    "✏️ Editar / Excluir Cliente",
+    "🧹 Limpeza Mensal"
 ])
 
 # ABA 1: REGISTRAR PAGAMENTO (AUTOMATIZADO)
@@ -317,7 +319,7 @@ with tab_cadastro:
                             "valor": novo_valor,
                             "telas": int(novo_telas)
                         })
-                    st.success(f"Cliente '{novo_nome}' salvo permanentemente na nuvem!")
+                    st.success(f"Cliente '{novo_nome}' saved permanentemente na nuvem!")
                     st.cache_resource.clear()
                     st.rerun()
                 except Exception as e:
@@ -370,6 +372,46 @@ with tab_editar:
                 st.rerun()
     else:
         st.info("Nenhum cliente cadastrado.")
+
+# ABA 4: 🧹 LIMPEZA MENSAL / RESET FINANCEIRO DO MÊS
+with tab_limpeza:
+    st.subheader("🧹 Resetar Recebimentos Mensais")
+    st.markdown("""
+    Use esta aba se quiser apagar os pagamentos registrados em um mês específico para reiniciar a contagem do faturamento. 
+    **Isso NÃO apaga seus clientes**, apenas limpa o histórico de faturamento do período escolhido para que os gráficos comecem do zero.
+    """)
+    
+    dict_meses = {
+        "01": "Janeiro", "02": "Fevereiro", "03": "Março", "04": "Abril",
+        "05": "Maio", "06": "Junho", "07": "Julho", "08": "Agosto",
+        "09": "Setembro", "10": "Outubro", "11": "Novembro", "12": "Dezembro"
+    }
+    
+    col_m, col_a = st.columns(2)
+    with col_m:
+        mes_sel = st.selectbox("Mês para limpar:", list(dict_meses.keys()), format_func=lambda x: dict_meses[x], index=int(hoje.strftime("%m")) - 1, key="limpeza_mes")
+    with col_a:
+        ano_sel = st.selectbox("Ano para limpar:", [hoje.year, hoje.year - 1, hoje.year + 1], key="limpeza_ano")
+        
+    padrao_data_busca = f"/%s/%s " % (mes_sel, ano_sel) # Busca pelo padrão '/MM/YYYY ' contido na string de data
+    
+    st.warning(f"⚠️ **Atenção:** Você está prestes a deletar todos os recebimentos de **{dict_meses[mes_sel]}/{ano_sel}**. O painel desse mês será zerado!")
+    confirmar_check = st.checkbox(f"Confirmo que desejo zerar o histórico de {dict_meses[mes_sel]}/{ano_sel}.", key="chk_limpeza")
+    
+    if st.button("🔥 Confirmar Limpeza e Limpar Painel", key="btn_executar_limpeza"):
+        if not confirmar_check:
+            st.error("Você precisa marcar a caixa de seleção acima para autorizar a limpeza.")
+        else:
+            with engine.begin() as conn:
+                # Remove os registros do histórico baseados no mês e ano selecionados
+                resultado = conn.execute(
+                    text("DELETE FROM vision_historico WHERE data LIKE :padrao"),
+                    {"padrao": f"%{padrao_data_busca}%"}
+                )
+            
+            st.success(f"💥 Sucesso! O faturamento de {dict_meses[mes_sel]}/{ano_sel} foi limpo do banco de dados!")
+            st.cache_resource.clear()
+            st.rerun()
 
 # ==========================
 # ÚLTIMOS RECEBIMENTOS
