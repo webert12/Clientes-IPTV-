@@ -86,15 +86,10 @@ if not st.session_state["logado"]:
     # CSS Avançado: Força o sumiço completo de qualquer estrutura lateral e centraliza o formulário
     st.markdown("""
         <style>
-            /* Oculta o menu lateral e qualquer espaço reservado a ele */
             [data-testid="stSidebar"] { display: none !important; width: 0px !important; }
             [data-testid="stSidebarCollapseButton"] { display: none !important; }
             .collapsedControl { display: none !important; }
-            
-            /* Remove as margens superiores padrões do Streamlit para o login */
             .stAppHeader { display: none !important; }
-            
-            /* Centraliza perfeitamente o bloco de login e limita a largura para parecer um app nativo */
             [data-testid="stMainBlockContainer"] {
                 max-width: 520px !important;
                 margin: 0 auto !important;
@@ -117,21 +112,22 @@ if not st.session_state["logado"]:
                 st.error("Por favor, preencha todos os campos.")
             else:
                 with engine.connect() as conn:
+                    # Correção Definitiva: TRIM e LOWER eliminam espaços fantasmas e problemas de caixa alta/baixa
                     row = conn.execute(
-                        text("SELECT username, password, role FROM vision_usuarios WHERE username = :u"),
+                        text("SELECT username, password, role FROM vision_usuarios WHERE TRIM(LOWER(username)) = :u"),
                         {"u": user_input}
-                    ).fetchone()
+                    ).mappings().fetchone()
                     
-                    # Desempacotamento seguro via tupla para aceitar qualquer cadastro novo imediatamente
-                    if row and row[1] == pass_input:
+                    # Validação blindada usando chaves nominais textuais puras e remoção de espaços
+                    if row and str(row["password"]).strip() == pass_input:
                         st.session_state["logado"] = True
-                        st.session_state["usuario_nome"] = row[0]
-                        st.session_state["usuario_role"] = row[2]
+                        st.session_state["usuario_nome"] = str(row["username"]).strip()
+                        st.session_state["usuario_role"] = str(row["role"]).strip()
                         st.rerun()
                     else:
                         st.error("Usuário ou senha incorretos.")
                         
-    st.stop()  # Trava o script aqui. Absolutamente nada abaixo será lido ou renderizado.
+    st.stop()
 
 # ==============================================================================
 # ÁREA DO DASHBOARD (SÓ EXISTE E SÓ APARECE APÓS O LOGIN CORRETO)
