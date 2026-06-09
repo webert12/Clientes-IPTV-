@@ -8,8 +8,8 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
 
-# Configuração da página (deve ser o primeiro comando Streamlit)
-st.set_page_config(page_title="Vision Play TV", page_icon="📊", layout="wide")
+# Configuração da página (Inicia colapsado para evitar piscadas na tela de login)
+st.set_page_config(page_title="Vision Play TV", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
 
 # Configuração do Fuso Horário de Brasília
 CORRETO_FUSO = ZoneInfo("America/Sao_Paulo")
@@ -81,75 +81,95 @@ if "logado" not in st.session_state:
     st.session_state["usuario_nome"] = ""
     st.session_state["usuario_role"] = ""
 
-# SE NÃO ESTIVER LOGADO, MOSTRA APENAS A TELA DE LOGIN CENTRALIZADA E PARA A EXECUÇÃO
+# SE NÃO ESTIVER LOGADO, DESTRÓI O MENU LATERAL VISUALMENTE E MOSTRA SÓ O LOGIN
 if not st.session_state["logado"]:
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.markdown("<br><br><br>", unsafe_allow_html=True)
-        with st.form("form_login", clear_on_submit=False):
-            st.markdown("<h2 style='text-align: center;'>🔒 Vision Play TV</h2>", unsafe_allow_html=True)
-            st.markdown("<p style='text-align: center; color: gray;'>Insira suas credenciais para acessar o painel</p>", unsafe_allow_html=True)
+    # CSS Avançado: Força o sumiço completo de qualquer estrutura lateral e centraliza o formulário
+    st.markdown("""
+        <style>
+            /* Oculta o menu lateral e qualquer espaço reservado a ele */
+            [data-testid="stSidebar"] { display: none !important; width: 0px !important; }
+            [data-testid="stSidebarCollapseButton"] { display: none !important; }
+            .collapsedControl { display: none !important; }
             
-            user_input = st.text_input("Usuário:").strip().lower()
-            pass_input = st.text_input("Senha:", type="password").strip()
-            btn_login = st.form_submit_button("Entrar no Sistema", use_container_width=True)
+            /* Remove as margens superiores padrões do Streamlit para o login */
+            .stAppHeader { display: none !important; }
             
-            if btn_login:
+            /* Centraliza perfeitamente o bloco de login e limita a largura para parecer um app nativo */
+            [data-testid="stMainBlockContainer"] {
+                max-width: 520px !important;
+                margin: 0 auto !important;
+                padding-top: 8rem !important;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    with st.form("form_login", clear_on_submit=False):
+        st.markdown("<h2 style='text-align: center; color: #1E3A8A; margin-bottom: 0px;'>🔒 Vision Play TV</h2>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; color: #6B7280; font-size: 14px;'>Insira suas credenciais para acessar o painel</p>", unsafe_allow_html=True)
+        st.write("")
+        
+        user_input = st.text_input("Usuário:").strip().lower()
+        pass_input = st.text_input("Senha:", type="password").strip()
+        btn_login = st.form_submit_button("Entrar no Sistema", use_container_width=True)
+        
+        if btn_login:
+            if not user_input or not pass_input:
+                st.error("Por favor, preencha todos os campos.")
+            else:
                 with engine.connect() as conn:
-                    usuario_banco = conn.execute(
+                    row = conn.execute(
                         text("SELECT username, password, role FROM vision_usuarios WHERE username = :u"),
                         {"u": user_input}
                     ).fetchone()
                     
-                    if usuario_banco and usuario_banco[1] == pass_input:
+                    # Desempacotamento seguro via tupla para aceitar qualquer cadastro novo imediatamente
+                    if row and row[1] == pass_input:
                         st.session_state["logado"] = True
-                        st.session_state["usuario_nome"] = usuario_banco[0]
-                        st.session_state["usuario_role"] = "ADM" if usuario_banco[2] == "ADM" else "USER"
+                        st.session_state["usuario_nome"] = row[0]
+                        st.session_state["usuario_role"] = row[2]
                         st.rerun()
                     else:
                         st.error("Usuário ou senha incorretos.")
-        st.markdown("<p style='text-align: center; font-size: 12px; color: #888;'>💡 Administrador padrão: admin / admin123</p>", unsafe_allow_html=True)
-    st.stop()  # Impede completamente a renderização do restante do script
+                        
+    st.stop()  # Trava o script aqui. Absolutamente nada abaixo será lido ou renderizado.
 
 # ==============================================================================
-# SE CHEGOU AQUI, O USUÁRIO ESTÁ LOGADO. O SISTEMA SERÁ EXIBIDO ABAIXO:
+# ÁREA DO DASHBOARD (SÓ EXISTE E SÓ APARECE APÓS O LOGIN CORRETO)
 # ==============================================================================
 
 st.title("📊 Dashboard Vision Play TV")
 
-# Menu Lateral de Identificação e Logout
+# Menu Lateral de Identificação e Logout (Reaparece perfeitamente aqui)
+st.sidebar.markdown(f"# 🖥️ Menu de Controle")
 st.sidebar.markdown(f"👤 **Usuário:** `{st.session_state['usuario_nome']}`")
 st.sidebar.markdown(f"🎖️ **Nível:** `{st.session_state['usuario_role']}`")
+st.sidebar.divider()
 
 # ======================================
 # CAIXA POP-UP DE DIÁLOGO PARA LIMPEZA
 # ======================================
 @st.dialog("🧹 Escolha o Período para Limpar")
 def abrir_popup_limpeza():
-    st.write("Selecione ou digite o **Dia/Mês** dos recebimentos que deseja deletar permanentemente do histórico.")
+    st.write("Digite o **Dia/Mês** dos recebimentos que deseja deletar permanentemente do histórico.")
     data_limpar = st.text_input("Data desejada (Exemplo: 10/06 ou apenas /06 para o mês todo):", value=hoje.strftime("%d/%m"))
     
-    st.warning("⚠️ Esta ação vai apagar o faturamento correspondente ao período informado e atualizar os gráficos na hora!")
+    st.warning("⚠️ Esta ação vai apagar o faturamento correspondente ao período e atualizará o painel imediatamente!")
     
     if st.button("🔥 Confirmar e Zerar Agora", use_container_width=True):
         if not data_limpar.strip():
-            st.error("Insira um critério de data válido para prosseguir.")
+            st.error("Insira um formato de data válido para prosseguir.")
         else:
             with engine.begin() as conn:
                 if st.session_state["usuario_role"] == "ADM":
-                    # ADM limpa registros globais que batem com o padrão digitado
                     conn.execute(text("DELETE FROM vision_historico WHERE data LIKE :padrao"), {"padrao": f"%{data_limpar.strip()}%"})
                 else:
-                    # Usuário comum só apaga os dados pertencentes a ele
                     conn.execute(text("""
                         DELETE FROM vision_historico 
                         WHERE data LIKE :padrao AND usuario_owner = :owner
                     """), {"padrao": f"%{data_limpar.strip()}%", "owner": st.session_state["usuario_nome"]})
-            
-            st.toast("Histórico atualizado com sucesso!", icon="✅")
             st.rerun()
 
-# Botões de controle no topo da barra lateral
+# Botões de controle na barra lateral
 if st.sidebar.button("🔄 Sincronizar Banco de Dados", use_container_width=True):
     st.rerun()
 
@@ -171,11 +191,9 @@ def carregar_dados_supabase():
     
     with engine.connect() as conn:
         if role == "ADM":
-            # Administrador visualiza tudo de todas as contas cadastradas
             res_clientes = conn.execute(text("SELECT nome, whatsapp, vencimento, status, valor, telas FROM vision_clientes ORDER BY nome")).fetchall()
             res_historico = conn.execute(text("SELECT cliente, valor, data FROM vision_historico ORDER BY id ASC")).fetchall()
         else:
-            # Usuário comum fica restrito exclusivamente ao seu escopo de dono
             res_clientes = conn.execute(text("SELECT nome, whatsapp, vencimento, status, valor, telas FROM vision_clientes WHERE usuario_owner = :u ORDER BY nome"), {"u": username}).fetchall()
             res_historico = conn.execute(text("SELECT cliente, valor, data FROM vision_historico WHERE usuario_owner = :u ORDER BY id ASC"), {"u": username}).fetchall()
         
@@ -338,7 +356,7 @@ with abas[2]:
                 with engine.begin() as conn:
                     conn.execute(text("UPDATE vision_clientes SET whatsapp = :w, vencimento = :v, status = :s, valor = :val, telas = :t WHERE nome = :n"),
                                  {"w": edit_whatsapp, "v": edit_vencimento, "s": edit_status, "val": edit_valor, "t": int(edit_telas), "n": cli_edit["nome"]})
-                st.success("Dados updated na nuvem!")
+                st.success("Dados atualizados na nuvem!")
                 st.rerun()
                 
             if btn_deletar:
@@ -353,7 +371,7 @@ with abas[2]:
 if st.session_state["usuario_role"] == "ADM":
     with abas[3]:
         st.subheader("👤 Cadastro de Novos Usuários / Parceiros")
-        with st.form("form_novo_usuario"):
+        with st.form("form_novo_usuario", clear_on_submit=True):
             novo_user = st.text_input("Nome do Usuário (Login):").strip().lower()
             nova_senha = st.text_input("Senha de Acesso:", type="password").strip()
             novo_perfil = st.selectbox("Tipo de Conta / Permissão:", ["USER", "ADM"])
@@ -368,6 +386,7 @@ if st.session_state["usuario_role"] == "ADM":
                             conn.execute(text("INSERT INTO vision_usuarios (username, password, role) VALUES (:u, :p, :r)"),
                                          {"u": novo_user, "p": nova_senha, "r": novo_perfil})
                         st.success(f"Conta para o usuário '{novo_user}' criada com sucesso!")
+                        st.rerun()
                     except:
                         st.error("Erro: Esse nome de usuário já está sendo utilizado.")
 
