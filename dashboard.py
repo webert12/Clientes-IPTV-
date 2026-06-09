@@ -4,17 +4,29 @@ import pandas as pd
 import plotly.express as px
 from pathlib import Path
 from datetime import datetime
+from zoneinfo import ZoneInfo # Define o fuso horário padrão (Python 3.9+)
 from sqlalchemy import create_engine, text
+from sqlalchemy.pool import NullPool # Evita o cacheamento de conexões do banco
 
 st.title("📊 Dashboard Vision Play TV")
+
+# Configuração do Fuso Horário de Brasília
+CORRETO_FUSO = ZoneInfo("America/Sao_Paulo")
+agora_br = datetime.now(CORRETO_FUSO)
+hoje = agora_br.date()
+
+# Botão de atualização manual no topo para garantir o sincronismo instantâneo
+if st.sidebar.button("🔄 Atualizar Dados do Banco"):
+    st.cache_resource.clear()
+    st.rerun()
 
 # ======================================
 # CONEXÃO SEGURA COM O SUPABASE (VIA SECRETS)
 # ======================================
 @st.cache_resource
 def get_engine():
-    # Buscando a URL de forma segura do painel Secrets do Streamlit
-    return create_engine(st.secrets["DATABASE_URL"])
+    # Usamos 'NullPool' para forçar o Streamlit a buscar os dados mais recentes do Supabase a cada clique
+    return create_engine(st.secrets["DATABASE_URL"], poolclass=NullPool)
 
 engine = get_engine()
 
@@ -42,7 +54,7 @@ def inicializar_banco():
 
 inicializar_banco()
 
-# Sistema de migração automática (evita perder dados locais antigos na primeira execução)
+# Sistema de migração automática
 def migrar_dados_locais_para_supabase():
     with engine.connect() as conn:
         total_banco = conn.execute(text("SELECT COUNT(*) FROM vision_clientes")).scalar()
@@ -114,13 +126,12 @@ def carregar_dados_supabase():
             
         return lista_clientes, lista_historico
 
-# Carrega os dados reais do banco de dados
+# Carrega os dados reais e ATUALIZADOS do banco de dados
 clientes, historico = carregar_dados_supabase()
 
 # ======================================
 # LÓGICA DE PROCESSAMENTO DO DASHBOARD
 # ======================================
-hoje = datetime.now().date()
 total_clientes = len(clientes)
 
 em_dia = 0
@@ -219,11 +230,17 @@ st.subheader("⚙️ Ações")
 
 if clientes:
     nomes = [c["nome"] for c in clientes]
-    sel = st.selectbox("Cliente ação", nomes)
+    sel = st.selectbox("Escolha o Cliente para registrar o pagamento:", nomes)
     cli = next(c for c in clientes if c["nome"] == sel)
 
-    if st.button("💵 Receber pagamento"):
-        agora = datetime.now()
+    # Captura o valor cadastrado atualizado do cliente no banco
+    valor_cadastrado = float(cli.get("valor", 25.00))
+    
+    # Campo profissional para conferir/alterar o valor pago (puxa o valor do banco automaticamente)
+    valor_pago = st.number_input(f"Confirmar valor do pagamento para {cli['nome']} (R$):", min_value=0.0, value=valor_cadastrado, step=5.0)
+
+    if st.button("💵 Confirmar Recebimento"):
+        agora = datetime.now(CORRETO_FUSO)
         ano = agora.year
         mes = agora.month
 
@@ -235,9 +252,8 @@ if clientes:
 
         novo_vencimento = datetime(ano, mes, 10).strftime("%d/%m/%Y")
         data_historico = agora.strftime("%d/%m/%Y %H:%M")
-        valor_pago = float(cli.get("valor", 25.00))
 
-        # Atualiza o cliente e insere o histórico DIRETAMENTE NO SUPABASE
+        # Atualiza o cliente e insere o histórico com o valor dinâmico correto
         with engine.begin() as conn:
             conn.execute(text("""
                 UPDATE vision_clientes 
@@ -250,7 +266,8 @@ if clientes:
                 VALUES (:cliente, :valor, :data)
             """), {"cliente": cli["nome"], "valor": valor_pago, "data": data_historico})
 
-        st.success("Pagamento confirmado e salvo no Supabase!")
+        st.success(f"Pagamento de R$ {valor_pago:.2f} confirmado para {cli['nome']} com Sucesso!")
+        st.cache_resource.clear()
         st.rerun()
 
 # ==========================
@@ -271,7 +288,7 @@ st.subheader("📥 Backup Geral")
 backup = {
     "clientes": clientes,
     "historico": historico,
-    "exportado_em": datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    "exportado_em": datetime.now(CORRETO_FUSO).strftime("%d/%m/%Y %H:%M:%S")
 }
 
 st.download_button(
