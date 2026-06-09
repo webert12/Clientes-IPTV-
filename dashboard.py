@@ -4,9 +4,9 @@ import pandas as pd
 import plotly.express as px
 from pathlib import Path
 from datetime import datetime
-from zoneinfo import ZoneInfo # Define o fuso horário padrão (Python 3.9+)
+from zoneinfo import ZoneInfo
 from sqlalchemy import create_engine, text
-from sqlalchemy.pool import NullPool # Evita o cacheamento de conexões do banco
+from sqlalchemy.pool import NullPool
 
 st.title("📊 Dashboard Vision Play TV")
 
@@ -15,7 +15,7 @@ CORRETO_FUSO = ZoneInfo("America/Sao_Paulo")
 agora_br = datetime.now(CORRETO_FUSO)
 hoje = agora_br.date()
 
-# Botão de atualização manual no topo para garantir o sincronismo instantâneo
+# Botão de atualização manual no topo para sincronismo instantâneo
 if st.sidebar.button("🔄 Atualizar Dados do Banco"):
     st.cache_resource.clear()
     st.rerun()
@@ -25,12 +25,11 @@ if st.sidebar.button("🔄 Atualizar Dados do Banco"):
 # ======================================
 @st.cache_resource
 def get_engine():
-    # Usamos 'NullPool' para forçar o Streamlit a buscar os dados mais recentes do Supabase a cada clique
     return create_engine(st.secrets["DATABASE_URL"], poolclass=NullPool)
 
 engine = get_engine()
 
-# Criação automática das tabelas persistentes no Supabase
+# Criação e atualização automática das tabelas persistentes no Supabase
 def inicializar_banco():
     with engine.begin() as conn:
         conn.execute(text("""
@@ -42,6 +41,10 @@ def inicializar_banco():
                 status VARCHAR(50),
                 valor NUMERIC(10, 2)
             );
+        """))
+        # Garante a criação da coluna 'telas' de forma segura caso ela ainda não exista
+        conn.execute(text("""
+            ALTER TABLE vision_clientes ADD COLUMN IF NOT EXISTS telas INTEGER DEFAULT 1;
         """))
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS vision_historico (
@@ -69,15 +72,16 @@ def migrar_dados_locais_para_supabase():
                 with engine.begin() as conn:
                     for c in dados_c:
                         conn.execute(text("""
-                            INSERT INTO vision_clientes (nome, whatsapp, vencimento, status, valor)
-                            VALUES (:nome, :whatsapp, :vencimento, :status, :valor)
+                            INSERT INTO vision_clientes (nome, whatsapp, vencimento, status, valor, telas)
+                            VALUES (:nome, :whatsapp, :vencimento, :status, :valor, :telas)
                             ON CONFLICT (nome) DO NOTHING
                         """), {
                             "nome": c.get("nome", ""),
                             "whatsapp": c.get("whatsapp", ""),
                             "vencimento": c.get("vencimento", ""),
                             "status": c.get("status", ""),
-                            "valor": float(c.get("valor", 0))
+                            "valor": float(c.get("valor", 0)),
+                            "telas": int(c.get("telas", 1))
                         })
             except:
                 pass
@@ -100,10 +104,10 @@ def migrar_dados_locais_para_supabase():
 
 migrar_dados_locais_para_supabase()
 
-# Carregar dados diretamente do Supabase em tempo real
+# Carregar dados diretamente do Supabase em tempo real (incluindo a coluna telas)
 def carregar_dados_supabase():
     with engine.connect() as conn:
-        res_clientes = conn.execute(text("SELECT nome, whatsapp, vencimento, status, valor FROM vision_clientes ORDER BY nome")).fetchall()
+        res_clientes = conn.execute(text("SELECT nome, whatsapp, vencimento, status, valor, telas FROM vision_clientes ORDER BY nome")).fetchall()
         res_historico = conn.execute(text("SELECT cliente, valor, data FROM vision_historico ORDER BY id ASC")).fetchall()
         
         lista_clientes = []
@@ -113,7 +117,8 @@ def carregar_dados_supabase():
                 "whatsapp": r[1],
                 "vencimento": r[2],
                 "status": r[3],
-                "valor": float(r[4] if r[4] is not None else 0)
+                "valor": float(r[4] if r[4] is not None else 0),
+                "telas": int(r[5] if r[5] is not None else 1)
             })
             
         lista_historico = []
@@ -126,7 +131,7 @@ def carregar_dados_supabase():
             
         return lista_clientes, lista_historico
 
-# Carrega os dados reais e ATUALIZADOS do banco de dados
+# Carrega os dados reais e sincronizados do banco de dados
 clientes, historico = carregar_dados_supabase()
 
 # ======================================
@@ -164,7 +169,7 @@ for item in historico:
 receita_pendente = receita_prevista - receita_recebida
 
 # ==========================
-# CARDS
+# CARDS INFORMATIVOS
 # ==========================
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("👥 Clientes", total_clientes)
@@ -222,57 +227,154 @@ if alertas:
 else:
     st.success("Nenhum cliente próximo do vencimento.")
 
-# =========================
-# RECEBER PAGAMENTO (AÇÕES)
-# =========================
+# ======================================
+# SEÇÃO PROFISSIONAL DE GERENCIAMENTO (ABAS)
+# ======================================
 st.divider()
-st.subheader("⚙️ Ações")
+st.subheader("⚙️ Gerenciamento do Sistema (Ações em Tempo Real)")
 
-if clientes:
-    nomes = [c["nome"] for c in clientes]
-    sel = st.selectbox("Escolha o Cliente para registrar o pagamento:", nomes)
-    cli = next(c for c in clientes if c["nome"] == sel)
+tab_pagamento, tab_cadastro, tab_editar = st.tabs([
+    "💵 Registrar Pagamento", 
+    "➕ Cadastrar Novo Cliente", 
+    "✏️ Editar / Excluir Cliente"
+])
 
-    # Captura o valor cadastrado atualizado do cliente no banco
-    valor_cadastrado = float(cli.get("valor", 25.00))
-    
-    # Campo profissional para conferir/alterar o valor pago (puxa o valor do banco automaticamente)
-    valor_pago = st.number_input(f"Confirmar valor do pagamento para {cli['nome']} (R$):", min_value=0.0, value=valor_cadastrado, step=5.0)
+# ABA 1: REGISTRAR PAGAMENTO (AUTOMATIZADO)
+with tab_pagamento:
+    if clientes:
+        nomes = [c["nome"] for c in clientes]
+        sel = st.selectbox("Escolha o Cliente para registrar o pagamento:", nomes, key="sel_pagamento")
+        cli = next(c for c in clientes if c["nome"] == sel)
 
-    if st.button("💵 Confirmar Recebimento"):
-        agora = datetime.now(CORRETO_FUSO)
-        ano = agora.year
-        mes = agora.month
+        # Detecta automaticamente os valores reais e atuais do banco de dados
+        valor_pago = float(cli.get("valor", 25.00))
+        telas_cliente = int(cli.get("telas", 1))
 
-        if agora.day > 10:
-            mes += 1
-            if mes > 12:
-                mes = 1
-                ano += 1
+        # Exibe os dados detectados para conferência visual rápida
+        st.markdown(f"📋 **Plano Detectado para {cli['nome']}:**")
+        st.markdown(f"🖥️ **Quantidade de Telas:** `{telas_cliente}` | 💰 **Valor Mensal Cadastrado:** `R$ {valor_pago:.2f}`")
+        
+        st.info(f"Ao clicar no botão abaixo, o sistema confirmará o recebimento de **R$ {valor_pago:.2f}** automaticamente.")
 
-        novo_vencimento = datetime(ano, mes, 10).strftime("%d/%m/%Y")
-        data_historico = agora.strftime("%d/%m/%Y %H:%M")
+        if st.button("⚡ Confirmar Recebimento Automático", key="btn_confirmar_pag"):
+            agora = datetime.now(CORRETO_FUSO)
+            ano = agora.year
+            mes = agora.month
 
-        # Atualiza o cliente e insere o histórico com o valor dinâmico correto
-        with engine.begin() as conn:
-            conn.execute(text("""
-                UPDATE vision_clientes 
-                SET status = 'Recebido', vencimento = :vencimento 
-                WHERE nome = :nome
-            """), {"vencimento": novo_vencimento, "nome": cli["nome"]})
+            if agora.day > 10:
+                mes += 1
+                if mes > 12:
+                    mes = 1
+                    ano += 1
 
-            conn.execute(text("""
-                INSERT INTO vision_historico (cliente, valor, data) 
-                VALUES (:cliente, :valor, :data)
-            """), {"cliente": cli["nome"], "valor": valor_pago, "data": data_historico})
+            novo_vencimento = datetime(ano, mes, 10).strftime("%d/%m/%Y")
+            data_historico = agora.strftime("%d/%m/%Y %H:%M")
 
-        st.success(f"Pagamento de R$ {valor_pago:.2f} confirmado para {cli['nome']} com Sucesso!")
-        st.cache_resource.clear()
-        st.rerun()
+            with engine.begin() as conn:
+                conn.execute(text("""
+                    UPDATE vision_clientes 
+                    SET status = 'Recebido', vencimento = :vencimento 
+                    WHERE nome = :nome
+                """), {"vencimento": novo_vencimento, "nome": cli["nome"]})
+
+                conn.execute(text("""
+                    INSERT INTO vision_historico (cliente, valor, data) 
+                    VALUES (:cliente, :valor, :data)
+                """), {"cliente": cli["nome"], "valor": valor_pago, "data": data_historico})
+
+            st.success(f"Sucesso! Pagamento de R$ {valor_pago:.2f} processado para {cli['nome']}.")
+            st.cache_resource.clear()
+            st.rerun()
+    else:
+        st.info("Nenhum cliente disponível para registrar pagamentos.")
+
+# ABA 2: CADASTRAR NOVO CLIENTE DIRETO NO SUPABASE
+with tab_cadastro:
+    with st.form("form_novo_cadastro", clear_on_submit=True):
+        novo_nome = st.text_input("Nome Completo do Cliente:")
+        novo_whatsapp = st.text_input("WhatsApp (com DDD):")
+        novo_vencimento = st.text_input("Data de Vencimento (Ex: 10/06/2026):", value=hoje.strftime("10/%m/%Y"))
+        novo_status = st.selectbox("Status Inicial do Cliente:", ["Em Dia", "Vencendo", "Vencidos"])
+        novo_telas = st.number_input("Quantidade de Telas do Cliente:", min_value=1, value=1, step=1)
+        novo_valor = st.number_input("Valor Cobrado Mensalmente (R$):", min_value=0.0, value=25.00, step=5.0)
+        
+        btn_salvar_cadastro = st.form_submit_button("➕ Salvar Cliente na Nuvem")
+        
+        if btn_salvar_cadastro:
+            if not novo_nome.strip():
+                st.error("Por favor, preencha o nome do cliente.")
+            else:
+                try:
+                    with engine.begin() as conn:
+                        conn.execute(text("""
+                            INSERT INTO vision_clientes (nome, whatsapp, vencimento, status, valor, telas)
+                            VALUES (:nome, :whatsapp, :vencimento, :status, :valor, :telas)
+                        """), {
+                            "nome": novo_nome.strip(),
+                            "whatsapp": novo_whatsapp.strip(),
+                            "vencimento": novo_vencimento.strip(),
+                            "status": novo_status,
+                            "valor": novo_valor,
+                            "telas": int(novo_telas)
+                        })
+                    st.success(f"Cliente '{novo_nome}' salvo permanentemente na nuvem!")
+                    st.cache_resource.clear()
+                    st.rerun()
+                except Exception as e:
+                    st.error("Erro: Já existe um cliente cadastrado com esse nome.")
+
+# ABA 3: EDITAR OU DELETAR CLIENTE
+with tab_editar:
+    if clientes:
+        nomes_edit = [c["nome"] for c in clientes]
+        sel_edit = st.selectbox("Selecione o cliente que deseja modificar ou remover:", nomes_edit, key="sel_edicao")
+        cli_edit = next(c for c in clientes if c["nome"] == sel_edit)
+        
+        with st.form("form_modificar_cliente"):
+            st.markdown(f"**Modificando dados de:** {cli_edit['nome']}")
+            edit_whatsapp = st.text_input("WhatsApp cadastrado:", value=cli_edit["whatsapp"])
+            edit_vencimento = st.text_input("Data de Vencimento:", value=cli_edit["vencimento"])
+            edit_status = st.selectbox("Status Atual:", ["Em Dia", "Vencendo", "Vencidos"], index=["Em Dia", "Vencendo", "Vencidos"].index(cli_edit["status"]) if cli_edit["status"] in ["Em Dia", "Vencendo", "Vencidos"] else 0)
+            edit_telas = st.number_input("Quantidade de Telas:", min_value=1, value=int(cli_edit.get("telas", 1)), step=1)
+            edit_valor = st.number_input("Valor da Mensalidade (R$):", min_value=0.0, value=float(cli_edit["valor"]), step=5.0)
+            
+            c_b1, c_b2 = st.columns(2)
+            with c_b1:
+                btn_atualizar = st.form_submit_button("💾 Salvar Alterações")
+            with c_b2:
+                btn_deletar = st.form_submit_button("🚨 EXCLUIR CLIENTE DO BANCO")
+            
+            if btn_atualizar:
+                with engine.begin() as conn:
+                    conn.execute(text("""
+                        UPDATE vision_clientes 
+                        SET whatsapp = :whatsapp, vencimento = :vencimento, status = :status, valor = :valor, telas = :telas 
+                        WHERE nome = :nome
+                    """), {
+                        "whatsapp": edit_whatsapp,
+                        "vencimento": edit_vencimento,
+                        "status": edit_status,
+                        "valor": edit_valor,
+                        "telas": int(edit_telas),
+                        "nome": cli_edit["nome"]
+                    })
+                st.success(f"Os dados de {cli_edit['nome']} foram atualizados na nuvem!")
+                st.cache_resource.clear()
+                st.rerun()
+                
+            if btn_deletar:
+                with engine.begin() as conn:
+                    conn.execute(text("DELETE FROM vision_clientes WHERE nome = :nome"), {"nome": cli_edit["nome"]})
+                st.success(f"Cliente {cli_edit['nome']} foi permanentemente removido.")
+                st.cache_resource.clear()
+                st.rerun()
+    else:
+        st.info("Nenhum cliente cadastrado.")
 
 # ==========================
 # ÚLTIMOS RECEBIMENTOS
 # ==========================
+st.divider()
 st.subheader("💵 Últimos Recebimentos")
 
 if historico:
@@ -281,9 +383,9 @@ if historico:
 else:
     st.info("Nenhum recebimento registrado.")
 
-# ======================================
-# EXPORTAÇÃO GERAL (BACKUP)
-# ======================================
+# ==========================
+# BACKUP
+# ==========================
 st.subheader("📥 Backup Geral")
 backup = {
     "clientes": clientes,
