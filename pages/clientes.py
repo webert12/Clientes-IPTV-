@@ -41,7 +41,7 @@ tab_lista, tab_cadastro, tab_importacao = st.tabs([
 ])
 
 # ======================================
-# ABA 1: LISTA DE CLIENTES ATUAIS
+# ABA 1: LISTA DE CLIENTES ATUAIS (COM EDIÇÃO)
 # ======================================
 with tab_lista:
     st.subheader("Todos os Clientes Armazenados na Nuvem")
@@ -53,6 +53,61 @@ with tab_lista:
             use_container_width=True, 
             hide_index=True
         )
+        
+        st.divider()
+        
+        # --- NOVA SEÇÃO: EDICAO DE CLIENTE DIRETO NA LISTA ---
+        with st.expander("✏️ Editar Cadastro de um Cliente"):
+            nomes_clientes = df_clientes["nome"].tolist()
+            cliente_para_editar = st.selectbox("Escolha o cliente que deseja modificar:", ["-- Selecione um Cliente --"] + nomes_clientes)
+            
+            if cliente_para_editar != "-- Selecione um Cliente --":
+                # Filtra os dados atuais do cliente selecionado na tabela
+                dados_cli = df_clientes[df_clientes["nome"] == cliente_para_editar].iloc[0]
+                cliente_id = int(dados_cli["id"])
+                
+                with st.form("form_editar_cliente_lista", clear_on_submit=False):
+                    st.markdown(f"**Modificando os dados de:** `{dados_cli['nome']}`")
+                    
+                    edit_nome = st.text_input("Nome do Cliente:", value=dados_cli["nome"])
+                    edit_whatsapp = st.text_input("WhatsApp (com DDD):", value=dados_cli["whatsapp"])
+                    edit_vencimento = st.text_input("Data de Vencimento:", value=dados_cli["vencimento"])
+                    
+                    lista_status = ["Em Dia", "Vencendo", "Vencidos"]
+                    status_atual = dados_cli["status"]
+                    idx_status = lista_status.index(status_atual) if status_atual in lista_status else 0
+                    edit_status = st.selectbox("Status Atual:", lista_status, index=idx_status)
+                    
+                    edit_valor = st.number_input("Valor da Mensalidade (R$):", min_value=0.0, value=float(dados_cli["valor"]), step=5.0)
+                    edit_telas = st.number_input("Quantidade de Telas:", min_value=1, value=int(dados_cli["telas"]), step=1)
+                    
+                    btn_atualizar = st.form_submit_button("💾 Salvar Alterações na Nuvem")
+                    
+                    if btn_atualizar:
+                        if not edit_nome.strip():
+                            st.error("O nome do cliente não pode ficar vazio.")
+                        else:
+                            try:
+                                with engine.begin() as conn:
+                                    conn.execute(text("""
+                                        UPDATE vision_clientes 
+                                        SET nome = :nome, whatsapp = :whatsapp, vencimento = :vencimento, 
+                                            status = :status, valor = :valor, telas = :telas 
+                                        WHERE id = :id
+                                    """), {
+                                        "nome": edit_nome.strip(),
+                                        "whatsapp": edit_whatsapp.strip(),
+                                        "vencimento": edit_vencimento.strip(),
+                                        "status": edit_status,
+                                        "valor": edit_valor,
+                                        "telas": int(edit_telas),
+                                        "id": cliente_id
+                                    })
+                                st.success(f"Alterações salvas! Os novos valores de '{edit_nome}' já estão valendo em todo o sistema.")
+                                st.cache_resource.clear()
+                                st.rerun()
+                            except Exception as e:
+                                st.error("Erro ao atualizar: Verifique se o novo nome inserido já pertence a outro usuário.")
         
         st.divider()
         
@@ -146,13 +201,11 @@ with tab_importacao:
                     if not linha_limpa:
                         continue
                     
-                    # Mecanismo de Inteligência: Separa nomes limpos cortando dados extras (como senhas após dois pontos, barras, etc.)
                     nome_extraido = linha_limpa
                     for separador in [":", "/", "|", "-", ";"]:
                         if separador in linha_limpa:
                             partes = linha_limpa.split(separador)
                             provisorio = partes[0].strip()
-                            # Evita pegar números puros como whatsapp no lugar do nome
                             if provisorio and not provisorio.isdigit():
                                 nome_extraido = provisorio
                                 break
@@ -160,7 +213,6 @@ with tab_importacao:
                     nome_final = nome_extraido.strip()
                     
                     if nome_final:
-                        # Executa inserção ignorando duplicados (ON CONFLICT DO NOTHING)
                         result = conn.execute(text("""
                             INSERT INTO vision_clientes (nome, whatsapp, vencimento, status, valor, telas)
                             VALUES (:nome, :whatsapp, :vencimento, :status, :valor, :telas)
@@ -174,7 +226,6 @@ with tab_importacao:
                             "telas": int(telas_padrao)
                         })
                         
-                        # Se rowcount for maior que 0, significa que inseriu um novo registro
                         if result.rowcount > 0:
                             sucesso += 1
                         else:
