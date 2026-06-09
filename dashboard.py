@@ -112,14 +112,17 @@ if not st.session_state["logado"]:
                 st.error("Por favor, preencha todos os campos.")
             else:
                 with engine.connect() as conn:
-                    # Correção Definitiva: TRIM e LOWER eliminam espaços fantasmas e problemas de caixa alta/baixa
+                    # Correção absoluta: O próprio banco valida usuário e senha simultaneamente com remoção de espaços espelho
                     row = conn.execute(
-                        text("SELECT username, password, role FROM vision_usuarios WHERE TRIM(LOWER(username)) = :u"),
-                        {"u": user_input}
+                        text("""
+                            SELECT username, role 
+                            FROM vision_usuarios 
+                            WHERE TRIM(LOWER(username)) = :u AND TRIM(password) = :p
+                        """),
+                        {"u": user_input, "p": pass_input}
                     ).mappings().fetchone()
                     
-                    # Validação blindada usando chaves nominais textuais puras e remoção de espaços
-                    if row and str(row["password"]).strip() == pass_input:
+                    if row:
                         st.session_state["logado"] = True
                         st.session_state["usuario_nome"] = str(row["username"]).strip()
                         st.session_state["usuario_role"] = str(row["role"]).strip()
@@ -135,7 +138,7 @@ if not st.session_state["logado"]:
 
 st.title("📊 Dashboard Vision Play TV")
 
-# Menu Lateral de Identificação e Logout (Reaparece perfeitamente aqui)
+# Menu Lateral de Identificação e Logout
 st.sidebar.markdown(f"# 🖥️ Menu de Controle")
 st.sidebar.markdown(f"👤 **Usuário:** `{st.session_state['usuario_nome']}`")
 st.sidebar.markdown(f"🎖️ **Nível:** `{st.session_state['usuario_role']}`")
@@ -302,7 +305,7 @@ with abas[0]:
 
 # ABA 2: CADASTRAR NOVO CLIENTE
 with abas[1]:
-    with st.form("form_novo_cadastro", clear_on_submit=True):
+    with st.form("form_novo_cadastro", clear_on_submit=False):
         novo_nome = st.text_input("Nome Completo do Cliente:")
         novo_whatsapp = st.text_input("WhatsApp (com DDD):")
         novo_vencimento = st.text_input("Data de Vencimento (Ex: 10/06/2026):", value=hoje.strftime("10/%m/%Y"))
@@ -367,7 +370,7 @@ with abas[2]:
 if st.session_state["usuario_role"] == "ADM":
     with abas[3]:
         st.subheader("👤 Cadastro de Novos Usuários / Parceiros")
-        with st.form("form_novo_usuario", clear_on_submit=True):
+        with st.form("form_novo_usuario", clear_on_submit=False):
             novo_user = st.text_input("Nome do Usuário (Login):").strip().lower()
             nova_senha = st.text_input("Senha de Acesso:", type="password").strip()
             novo_perfil = st.selectbox("Tipo de Conta / Permissão:", ["USER", "ADM"])
@@ -379,8 +382,11 @@ if st.session_state["usuario_role"] == "ADM":
                 else:
                     try:
                         with engine.begin() as conn:
-                            conn.execute(text("INSERT INTO vision_usuarios (username, password, role) VALUES (:u, :p, :r)"),
-                                         {"u": novo_user, "p": nova_senha, "r": novo_perfil})
+                            # Garante inserção limpa usando TRIM direto no banco de dados
+                            conn.execute(text("""
+                                INSERT INTO vision_usuarios (username, password, role) 
+                                VALUES (TRIM(LOWER(:u)), TRIM(:p), :r)
+                            """), {"u": novo_user, "p": nova_senha, "r": novo_perfil})
                         st.success(f"Conta para o usuário '{novo_user}' criada com sucesso!")
                         st.rerun()
                     except:
