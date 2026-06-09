@@ -3,7 +3,7 @@ import json
 import pandas as pd
 import plotly.express as px
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
@@ -28,7 +28,7 @@ engine = get_engine()
 # Criação e atualização automática das tabelas persistentes no Supabase
 def inicializar_banco():
     with engine.begin() as conn:
-        # 1. TABELA DE USUÁRIOS DO SISTEMA
+        # 1. TABELA DE USUÁRIOS DO SISTEMA (Atualizada com controle de tempo e bloqueio)
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS vision_usuarios (
                 id SERIAL PRIMARY KEY,
@@ -38,15 +38,23 @@ def inicializar_banco():
             );
         """))
         
-        # Cria o Administrador Padrão caso o banco esteja totalmente vazio
+        # Migrações seguras para adicionar colunas de controle temporal se não existirem
+        conn.execute(text("ALTER TABLE vision_usuarios ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'Ativo';"))
+        conn.execute(text("ALTER TABLE vision_usuarios ADD COLUMN IF NOT EXISTS tipo_conta VARCHAR(50) DEFAULT 'Final';"))
+        conn.execute(text("ALTER TABLE vision_usuarios ADD COLUMN IF NOT EXISTS vencimento_usuario VARCHAR(50);"))
+        
+        # Garante que usuários antigos tenham uma data válida distante para não bloquearem por erro
+        conn.execute(text("UPDATE vision_usuarios SET vencimento_usuario = '31/12/2030' WHERE vencimento_usuario IS NULL;"))
+        
+        # Cria o Administrador Padrão permanente caso o banco esteja totalmente vazio
         total_usuarios = conn.execute(text("SELECT COUNT(*) FROM vision_usuarios")).scalar()
         if total_usuarios == 0:
             conn.execute(text("""
-                INSERT INTO vision_usuarios (username, password, role)
-                VALUES ('admin', 'admin123', 'ADM');
+                INSERT INTO vision_usuarios (username, password, role, status, tipo_conta, vencimento_usuario)
+                VALUES ('admin', 'admin123', 'ADM', 'Ativo', 'Final', '31/12/2030');
             """))
 
-        # 2. TABELA DE CLIENTES (Com identificador de dono)
+        # 2. TABELA DE CLIENTES
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS vision_clientes (
                 id SERIAL PRIMARY KEY,
@@ -60,7 +68,7 @@ def inicializar_banco():
         conn.execute(text("ALTER TABLE vision_clientes ADD COLUMN IF NOT EXISTS telas INTEGER DEFAULT 1;"))
         conn.execute(text("ALTER TABLE vision_clientes ADD COLUMN IF NOT EXISTS usuario_owner VARCHAR(255) DEFAULT 'admin';"))
         
-        # 3. TABELA DE HISTÓRICO DE PAGAMENTOS (Com identificador de dono)
+        # 3. TABELA DE HISTÓRICO DE PAGAMENTOS
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS vision_historico (
                 id SERIAL PRIMARY KEY,
@@ -83,7 +91,6 @@ if "logado" not in st.session_state:
 
 # SE NÃO ESTIVER LOGADO, DESTRÓI O MENU LATERAL VISUALMENTE E MOSTRA SÓ O LOGIN
 if not st.session_state["logado"]:
-    # CSS Avançado: Força o sumiço completo de qualquer estrutura lateral e centraliza o formulário
     st.markdown("""
         <style>
             [data-testid="stSidebar"] { display: none !important; width: 0px !important; }
@@ -112,10 +119,9 @@ if not st.session_state["logado"]:
                 st.error("Por favor, preencha todos os campos.")
             else:
                 with engine.connect() as conn:
-                    # Correção absoluta: O próprio banco valida usuário e senha simultaneamente com remoção de espaços espelho
                     row = conn.execute(
                         text("""
-                            SELECT username, role 
+                            SELECT username, role, status, vencimento_usuario 
                             FROM vision_usuarios 
                             WHERE TRIM(LOWER(username)) = :u AND TRIM(password) = :p
                         """),
@@ -123,57 +129,64 @@ if not st.session_state["logado"]:
                     ).mappings().fetchone()
                     
                     if row:
-                        st.session_state["logado"] = True
-                        st.session_state["usuario_nome"] = str(row["username"]).strip()
-                        st.session_state["usuario_role"] = str(row["role"]).strip()
-                        st.rerun()
+                        # Validação Temporal de Bloqueio Imediato
+                        status_atual = str(row["status"]).strip()
+                        venc_str = str(row["vencimento_usuario"]).strip()
+                        role_atual = str(row["role"]).strip()
+                        
+                        conta_vencida = False
+                        try:
+                            data_venc = datetime.strptime(venc_str, "%d/%m/%Y").date()
+                            if data_venc < hoje:
+                                conta_vencida = True
+                        except:
+                            pass
+                        
+                        if status_atual == "Bloqueado" or (conta_vencida and role_atual != "ADM"):
+                            # Auto-bloqueio no banco se expirou pelo tempo
+                            if conta_vencida and status_atual != "Bloqueado":
+                                with engine.begin() as up_conn:
+                                    up_conn.execute(text("UPDATE vision_usuarios SET status = 'Bloqueado' WHERE TRIM(LOWER(username)) = :u"), {"u": user_input})
+                            st.error("🚫 Acesso Recusado: Esta conta está vencida ou foi bloqueada pelo Administrador!")
+                        else:
+                            st.session_state["logado"] = True
+                            st.session_state["usuario_nome"] = str(row["username"]).strip()
+                            st.session_state["usuario_role"] = role_atual
+                            st.rerun()
                     else:
                         st.error("Usuário ou senha incorretos.")
                         
     st.stop()
 
 # ==============================================================================
-# ÁREA DO DASHBOARD (SÓ EXISTE E SÓ APARECE APÓS O LOGIN CORRETO)
+# ÁREA DO DASHBOARD (SÓ ACCESSÍVEL APÓS AUTENTICAÇÃO FILTRADA)
 # ==============================================================================
 
 st.title("📊 Dashboard Vision Play TV")
 
-# Menu Lateral de Identificação e Logout
+# Menu Lateral Restrito por Nível de Acesso
 st.sidebar.markdown(f"# 🖥️ Menu de Controle")
 st.sidebar.markdown(f"👤 **Usuário:** `{st.session_state['usuario_nome']}`")
 st.sidebar.markdown(f"🎖️ **Nível:** `{st.session_state['usuario_role']}`")
 st.sidebar.divider()
 
-# ======================================
-# CAIXA POP-UP DE DIÁLOGO PARA LIMPEZA
-# ======================================
+# CAIXA POP-UP EXCLUSIVA PARA ADM
 @st.dialog("🧹 Escolha o Período para Limpar")
 def abrir_popup_limpeza():
-    st.write("Digite o **Dia/Mês** dos recebimentos que deseja deletar permanentemente do histórico.")
-    data_limpar = st.text_input("Data desejada (Exemplo: 10/06 ou apenas /06 para o mês todo):", value=hoje.strftime("%d/%m"))
-    
-    st.warning("⚠️ Esta ação vai apagar o faturamento correspondente ao período e atualizará o painel imediatamente!")
-    
+    st.write("Digite o **Dia/Mês** dos recebimentos que deseja deletar do histórico.")
+    data_limpar = st.text_input("Data desejada:", value=hoje.strftime("%d/%m"))
     if st.button("🔥 Confirmar e Zerar Agora", use_container_width=True):
-        if not data_limpar.strip():
-            st.error("Insira um formato de data válido para prosseguir.")
-        else:
+        if data_limpar.strip():
             with engine.begin() as conn:
-                if st.session_state["usuario_role"] == "ADM":
-                    conn.execute(text("DELETE FROM vision_historico WHERE data LIKE :padrao"), {"padrao": f"%{data_limpar.strip()}%"})
-                else:
-                    conn.execute(text("""
-                        DELETE FROM vision_historico 
-                        WHERE data LIKE :padrao AND usuario_owner = :owner
-                    """), {"padrao": f"%{data_limpar.strip()}%", "owner": st.session_state["usuario_nome"]})
+                conn.execute(text("DELETE FROM vision_historico WHERE data LIKE :padrao"), {"padrao": f"%{data_limpar.strip()}%"})
             st.rerun()
 
-# Botões de controle na barra lateral
-if st.sidebar.button("🔄 Sincronizar Banco de Dados", use_container_width=True):
-    st.rerun()
-
-if st.sidebar.button("🧹 Zerar Lançamentos por Data", use_container_width=True):
-    abrir_popup_limpeza()
+# Botões da Barra Lateral visíveis APENAS para administradores
+if st.session_state["usuario_role"] == "ADM":
+    if st.sidebar.button("🔄 Sincronizar Banco de Dados", use_container_width=True):
+        st.rerun()
+    if st.sidebar.button("🧹 Zerar Lançamentos por Data", use_container_width=True):
+        abrir_popup_limpeza()
 
 if st.sidebar.button("🚪 Sair / Desconectar", use_container_width=True):
     st.session_state["logado"] = False
@@ -182,7 +195,7 @@ if st.sidebar.button("🚪 Sair / Desconectar", use_container_width=True):
     st.rerun()
 
 # ======================================
-# CARREGAMENTO FILTRADO POR USUÁRIO (MULTI-TENANCY)
+# CARREGAMENTO ISOLADO (ANTI-VAZAMENTO DE DADOS)
 # ======================================
 def carregar_dados_supabase():
     role = st.session_state["usuario_role"]
@@ -193,8 +206,20 @@ def carregar_dados_supabase():
             res_clientes = conn.execute(text("SELECT nome, whatsapp, vencimento, status, valor, telas FROM vision_clientes ORDER BY nome")).fetchall()
             res_historico = conn.execute(text("SELECT cliente, valor, data FROM vision_historico ORDER BY id ASC")).fetchall()
         else:
-            res_clientes = conn.execute(text("SELECT nome, whatsapp, vencimento, status, valor, telas FROM vision_clientes WHERE usuario_owner = :u ORDER BY nome"), {"u": username}).fetchall()
-            res_historico = conn.execute(text("SELECT cliente, valor, data FROM vision_historico WHERE usuario_owner = :u ORDER BY id ASC"), {"u": username}).fetchall()
+            # Isolamento absoluto baseado no dono da conta (usuario_owner)
+            res_clientes = conn.execute(text("""
+                SELECT nome, whatsapp, vencimento, status, valor, telas 
+                FROM vision_clientes 
+                WHERE TRIM(LOWER(usuario_owner)) = TRIM(LOWER(:u)) 
+                ORDER BY nome
+            """), {"u": username}).fetchall()
+            
+            res_historico = conn.execute(text("""
+                SELECT cliente, valor, data 
+                FROM vision_historico 
+                WHERE TRIM(LOWER(usuario_owner)) = TRIM(LOWER(:u)) 
+                ORDER BY id ASC
+            """), {"u": username}).fetchall()
         
         lista_clientes = [{"nome": r[0], "whatsapp": r[1], "vencimento": r[2], "status": r[3], "valor": float(r[4] or 0), "telas": int(r[5] or 1)} for r in res_clientes]
         lista_historico = [{"cliente": r[0], "valor": float(r[1] or 0), "data": r[2]} for r in res_historico]
@@ -203,7 +228,7 @@ def carregar_dados_supabase():
 clientes, historico = carregar_dados_supabase()
 
 # ======================================
-# LÓGICA DE PROCESSAMENTO DO DASHBOARD
+# CÁLCULOS DO PAINEL DE CONTROLE
 # ======================================
 total_clientes = len(clientes)
 em_dia, vencendo, vencidos = 0, 0, 0
@@ -212,7 +237,6 @@ receita_prevista, receita_recebida = 0, 0
 for cliente in clientes:
     valor = float(cliente.get("valor", 0))
     receita_prevista += valor
-
     try:
         vencimento = datetime.strptime(cliente["vencimento"], "%d/%m/%Y").date()
         dias = (vencimento - hoje).days
@@ -227,7 +251,6 @@ for item in historico:
 
 receita_pendente = receita_prevista - receita_recebida
 
-# Cards Informativos reajustados dinamicamente
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("👥 Clientes", total_clientes)
 c2.metric("💰 Previsto", f"R$ {receita_prevista:.2f}")
@@ -236,7 +259,6 @@ c4.metric("⚠️ Pendente", f"R$ {receita_pendente:.2f}")
 
 st.divider()
 
-# Gráficos Dinâmicos em Tempo Real
 col1, col2 = st.columns(2)
 with col1:
     df_status = pd.DataFrame({"Status": ["Em Dia", "Vencendo", "Vencidos"], "Quantidade": [em_dia, vencendo, vencidos]})
@@ -247,29 +269,13 @@ with col2:
 
 st.divider()
 
-# Listagem de Vencimentos Próximos
-st.subheader("⚠️ Clientes Próximos do Vencimento")
-alertas = []
-for cliente in clientes:
-    try:
-        vencimento = datetime.strptime(cliente["vencimento"], "%d/%m/%Y").date()
-        if (vencimento - hoje).days <= 2:
-            alertas.append({"Nome": cliente["nome"], "WhatsApp": cliente["whatsapp"], "Vencimento": cliente["vencimento"]})
-    except:
-        pass
-
-if alertas:
-    st.dataframe(pd.DataFrame(alertas), use_container_width=True, hide_index=True)
-else:
-    st.success("Nenhum cliente próximo do vencimento.")
-
-st.divider()
-st.subheader("⚙️ Gerenciamento do Sistema (Ações em Tempo Real)")
-
-# Definição das Abas Dinâmicas baseadas no Perfil Logado
+# ======================================
+# ABA DE GESTÃO EM TEMPO REAL
+# ======================================
+st.subheader("⚙️ Gerenciamento do Sistema")
 abas_disponiveis = ["💵 Registrar Pagamento", "➕ Cadastrar Novo Cliente", "✏️ Editar / Excluir Cliente"]
 if st.session_state["usuario_role"] == "ADM":
-    abas_disponiveis.append("👤 Criar Contas de Usuários")
+    abas_disponiveis.append("👤 Gerenciar Usuários do Sistema")
 
 abas = st.tabs(abas_disponiveis)
 
@@ -298,7 +304,7 @@ with abas[0]:
                 conn.execute(text("INSERT INTO vision_historico (cliente, valor, data, usuario_owner) VALUES (:cliente, :valor, :data, :owner)"), 
                              {"cliente": cli["nome"], "valor": valor_pago, "data": data_historico, "owner": st.session_state["usuario_nome"]})
 
-            st.success(f"Pagamento de R$ {valor_pago:.2f} processado com sucesso!")
+            st.success(f"Pagamento processado com sucesso!")
             st.rerun()
     else:
         st.info("Nenhum cliente disponível.")
@@ -366,33 +372,110 @@ with abas[2]:
     else:
         st.info("Nenhum cliente cadastrado.")
 
-# ABA 4 EXCLUSIVA: GERENCIAR CONTAS DE USUÁRIOS (SÓ APARECE PARA ADM)
+# ABA 4 EXCLUSIVA: GERENCIAR USUÁRIOS (SÓ APARECE PARA ADM)
 if st.session_state["usuario_role"] == "ADM":
     with abas[3]:
-        st.subheader("👤 Cadastro de Novos Usuários / Parceiros")
+        st.subheader("👤 Painel de Controle de Contas / Revendedores")
+        
+        # 1. FORMULÁRIO DE CRIAÇÃO COM CONTROLE TEMPORAL
         with st.form("form_novo_usuario", clear_on_submit=False):
-            novo_user = st.text_input("Nome do Usuário (Login):").strip().lower()
-            nova_senha = st.text_input("Senha de Acesso:", type="password").strip()
-            novo_perfil = st.selectbox("Tipo de Conta / Permissão:", ["USER", "ADM"])
-            btn_criar_user = st.form_submit_button("👤 Criar Conta")
+            col_u1, col_u2, col_u3 = st.columns(3)
+            with col_u1:
+                novo_user = st.text_input("Nome do Usuário (Login):").strip().lower()
+                nova_senha = st.text_input("Senha de Acesso:", type="password").strip()
+            with col_u2:
+                novo_perfil = st.selectbox("Tipo de Conta:", ["USER", "ADM"])
+                tipo_tempo = st.radio("Modalidade de Tempo:", ["Conta Teste", "Conta Final (30 dias)"], horizontal=True)
+            with col_u3:
+                dias_teste = st.number_input("Se for Teste, quantos dias?", min_value=1, max_value=90, value=1)
+            
+            btn_criar_user = st.form_submit_button("🚀 Gerar e Ativar Nova Conta")
             
             if btn_criar_user:
                 if not novo_user or not nova_senha:
-                    st.error("Preencha todos os campos corretamente.")
+                    st.error("Preencha todos os campos do formulário.")
                 else:
+                    # Cálculo exato do vencimento
+                    if tipo_tempo == "Conta Teste":
+                        data_calculada = hoje + timedelta(days=int(dias_teste))
+                        label_tipo = "Teste"
+                    else:
+                        data_calculada = hoje + timedelta(days=30)
+                        label_tipo = "Final"
+                        
+                    venc_formatado = data_calculada.strftime("%d/%m/%Y")
+                    
                     try:
                         with engine.begin() as conn:
-                            # Garante inserção limpa usando TRIM direto no banco de dados
                             conn.execute(text("""
-                                INSERT INTO vision_usuarios (username, password, role) 
-                                VALUES (TRIM(LOWER(:u)), TRIM(:p), :r)
-                            """), {"u": novo_user, "p": nova_senha, "r": novo_perfil})
-                        st.success(f"Conta para o usuário '{novo_user}' criada com sucesso!")
+                                INSERT INTO vision_usuarios (username, password, role, status, tipo_conta, vencimento_usuario) 
+                                VALUES (TRIM(LOWER(:u)), TRIM(:p), :r, 'Ativo', :tipo, :venc)
+                            """), {"u": novo_user, "p": nova_senha, "r": novo_perfil, "tipo": label_tipo, "venc": venc_formatado})
+                        st.success(f"Conta '{novo_user}' ativada com sucesso! Vencimento: {venc_formatado}")
                         st.rerun()
                     except:
-                        st.error("Erro: Esse nome de usuário já está sendo utilizado.")
+                        st.error("Erro: Esse login já existe.")
 
-# Listagem de Últimos Recebimentos Filtrados
+        st.divider()
+        st.subheader("📋 Lista Completa de Contas no Banco")
+        
+        # Leitura dinâmica atualizada das contas cadastrados
+        with engine.connect() as conn:
+            lista_raw = conn.execute(text("SELECT id, username, password, role, status, tipo_conta, vencimento_usuario FROM vision_usuarios ORDER BY id DESC")).mappings().fetchall()
+            df_usuarios = pd.DataFrame(lista_raw)
+            
+        if not df_usuarios.empty:
+            st.dataframe(df_usuarios, use_container_width=True, hide_index=True)
+            
+            # 2. SISTEMA DE EDIÇÃO E EXCLUSÃO FLUIDA
+            st.markdown("### ✏️ Modificar ou Remover Conta")
+            seletor_user = st.selectbox("Escolha a conta que deseja gerenciar:", df_usuarios["username"].tolist())
+            user_dados = df_usuarios[df_usuarios["username"] == seletor_user].iloc[0]
+            
+            with st.form("form_edicao_usuario"):
+                c_ed1, c_ed2, c_ed3 = st.columns(3)
+                with c_ed1:
+                    ed_username = st.text_input("Nome do Usuário (Login):", value=user_dados["username"]).strip().lower()
+                    ed_password = st.text_input("Senha de Acesso:", value=user_dados["password"]).strip()
+                with c_ed2:
+                    ed_vencimento = st.text_input("Data de Vencimento (DD/MM/AAAA):", value=user_dados["vencimento_usuario"]).strip()
+                with c_ed3:
+                    ed_status = st.selectbox("Status da Conta:", ["Ativo", "Bloqueado"], index=["Ativo", "Bloqueado"].index(user_dados["status"]))
+                    ed_role = st.selectbox("Nível:", ["USER", "ADM"], index=["USER", "ADM"].index(user_dados["role"]))
+                
+                col_btn1, col_btn2 = st.columns(2)
+                with col_btn1:
+                    btn_up_user = st.form_submit_button("💾 Atualizar Dados do Usuário")
+                with col_btn2:
+                    btn_del_user = st.form_submit_button("🔥 DELETAR USUÁRIO PERMANENTEMENTE")
+                
+                if btn_up_user:
+                    with engine.begin() as conn:
+                        # Atualiza cascateado tabelas caso mude o nome do dono
+                        if ed_username != user_dados["username"]:
+                            conn.execute(text("UPDATE vision_clientes SET usuario_owner = :novo WHERE usuario_owner = :velho"), {"novo": ed_username, "velho": user_dados["username"]})
+                            conn.execute(text("UPDATE vision_historico SET usuario_owner = :novo WHERE usuario_owner = :velho"), {"novo": ed_username, "velho": user_dados["username"]})
+                        
+                        conn.execute(text("""
+                            UPDATE vision_usuarios 
+                            SET username = :u, password = :p, vencimento_usuario = :v, status = :s, role = :r 
+                            WHERE id = :id
+                        """), {"u": ed_username, "p": ed_password, "v": ed_vencimento, "s": ed_status, "r": ed_role, "id": int(user_dados["id"])})
+                    st.success("Conta atualizada!")
+                    st.rerun()
+                    
+                if btn_del_user:
+                    if user_dados["username"] == "admin":
+                        st.error("Não é possível deletar o administrador master global.")
+                    else:
+                        with engine.begin() as conn:
+                            conn.execute(text("DELETE FROM vision_usuarios WHERE id = :id"), {"id": int(user_dados["id"])})
+                        st.success("Conta removida do sistema.")
+                        st.rerun()
+        else:
+            st.info("Nenhum usuário cadastrado.")
+
+# Listagem de Últimos Recebimentos
 st.divider()
 st.subheader("💵 Últimos Recebimentos")
 if historico:
