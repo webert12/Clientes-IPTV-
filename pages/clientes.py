@@ -1,331 +1,188 @@
 import streamlit as st
-import json
 import pandas as pd
-from pathlib import Path
 from datetime import datetime
-from calendar import monthrange
+from zoneinfo import ZoneInfo
+from sqlalchemy import create_engine, text
+from sqlalchemy.pool import NullPool
 
 st.title("👥 Gestão de Clientes")
 
-ARQ = Path("clientes.json")
+# Configuração de fuso horário de Brasília
+CORRETO_FUSO = ZoneInfo("America/Sao_Paulo")
+hoje = datetime.now(CORRETO_FUSO).date()
 
-if not ARQ.exists():
-    ARQ.write_text("[]", encoding="utf-8")
+# ======================================
+# CONEXÃO COM O BANCO DE DADOS (SUPABASE)
+# ======================================
+@st.cache_resource
+def get_engine():
+    return create_engine(st.secrets["DATABASE_URL"], poolclass=NullPool)
 
-# 🔥 IMPORTANTE: sempre recarregar dados atualizados
-def carregar_clientes():
-    return json.loads(ARQ.read_text(encoding="utf-8"))
+engine = get_engine()
 
-clientes = carregar_clientes()
+# Função para carregar os clientes direto do banco em tempo real
+def carregar_clientes_supabase():
+    with engine.connect() as conn:
+        query = text("SELECT id, nome, whatsapp, vencimento, status, valor, telas FROM vision_clientes ORDER BY nome")
+        df = pd.read_sql(query, conn)
+    return df
 
-# controle da exclusão em massa (OCULTO POR PADRÃO)
+df_clientes = carregar_clientes_supabase()
+
+# Controle da exclusão em massa
 if "show_delete" not in st.session_state:
     st.session_state["show_delete"] = False
 
-
-# =========================
-# IMPORTAÇÃO EM MASSA
-# =========================
-
-with st.expander("📥 Importar Clientes em Massa (Inteligente)"):
-
-    texto = st.text_area("Cole usuários / senhas / nomes", height=300)
-    valor_padrao = st.number_input("Valor Mensal", value=25.0, step=1.0)
-
-    if st.button("Processar Importação"):
-
-        linhas = [l.strip() for l in texto.splitlines() if l.strip()]
-
-        clientes_novos = []
-        tabela_preview = []
-
-        hoje = datetime.now()
-
-        for linha in linhas:
-
-            partes = linha.split()
-
-            nome = ""
-            usuario = ""
-            senha = ""
-
-            if len(partes) >= 3:
-                a, b, c = partes[0], partes[1], " ".join(partes[2:])
-
-                if any(char.isdigit() for char in a):
-                    usuario = a
-                    senha = b
-                    nome = c
-                else:
-                    nome = a
-                    usuario = b
-                    senha = c
-
-            elif len(partes) == 2:
-                usuario = partes[0]
-                senha = partes[1]
-                nome = partes[0]
-            else:
-                continue
-
-            ano = hoje.year
-            mes = hoje.month
-
-            if hoje.day > 10:
-                mes += 1
-                if mes > 12:
-                    mes = 1
-                    ano += 1
-
-            vencimento = datetime(ano, mes, 10)
-
-            clientes_novos.append({
-                "nome": nome,
-                "whatsapp": "",
-                "usuario": usuario,
-                "senha": senha,
-                "valor": valor_padrao,
-                "telas": 1,
-                "observacao": "",
-                "vencimento": vencimento.strftime("%d/%m/%Y"),
-                "status": "Pendente"
-            })
-
-            tabela_preview.append({
-                "Nome": nome,
-                "Usuário": usuario,
-                "Senha": senha,
-                "Telas": 1
-            })
-
-        clientes.extend(clientes_novos)
-
-        ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
-
-        st.success(f"{len(clientes_novos)} clientes importados!")
-
-        st.rerun()
-
-
-# =========================
-# STATUS COLORIDO
-# =========================
-
-def color_status(row):
-
-    if "💰" in str(row["Pagamento"]):
-        return ["background-color: #2ecc71; color: white;"] * len(row)
-
-    if "Pendente" in str(row["Pagamento"]):
-        return ["background-color: #f1c40f; color: black;"] * len(row)
-
-    return [""] * len(row)
-
-
-# =========================
-# FILTRO
-# =========================
-
-st.subheader("🔍 Pesquisa")
-
-pesquisa = st.text_input("Pesquisar cliente")
-
-status_filtro = st.selectbox(
-    "Filtrar",
-    ["Todos", "Em Dia", "Vencendo", "Vencido", "Recebido", "Pendente"]
-)
-
-hoje = datetime.now().date()
-
-clientes = carregar_clientes()  # 🔥 RECARREGA SEMPRE AQUI
-
-dados = []
-
-for i, c in enumerate(clientes):
-
-    try:
-        venc = datetime.strptime(c["vencimento"], "%d/%m/%Y").date()
-        dias = (venc - hoje).days
-
-        if dias < 0:
-            situacao = "Vencido"
-        elif dias <= 2:
-            situacao = "Vencendo"
-        else:
-            situacao = "Em Dia"
-    except:
-        situacao = "Desconhecido"
-
-    texto = (c["nome"] + c["usuario"] + c["whatsapp"]).lower()
-
-    if pesquisa.lower() not in texto:
-        continue
-
-    if status_filtro != "Todos":
-        if status_filtro in ["Em Dia", "Vencendo", "Vencido"]:
-            if situacao != status_filtro:
-                continue
-        else:
-            if c["status"] != status_filtro:
-                continue
-
-    pagamento = "💰 Recebido" if c["status"] == "Recebido" else "⏳ Pendente"
-
-    dados.append({
-        "ID": i,
-        "Nome": c["nome"],
-        "WhatsApp": c["whatsapp"],
-        "Usuário IPTV": c["usuario"],
-        "Valor": f"R$ {c['valor']:.2f}",
-        "Telas": c.get("telas", 1),
-        "Vencimento": c["vencimento"],
-        "Status": situacao,
-        "Pagamento": pagamento
-    })
-
-
-# =========================
-# TABELA
-# =========================
-
-st.subheader("📋 Lista de Clientes")
-
-if dados:
-
-    df = pd.DataFrame(dados)
-    styled = df.style.apply(color_status, axis=1)
-
-    st.dataframe(styled, use_container_width=True, hide_index=True)
-
-else:
-    st.warning("Nenhum cliente encontrado.")
-
-
-# =========================
-# COBRANÇA EM MASSA
-# =========================
-
-st.divider()
-st.subheader("📣 Cobrança em Massa")
-
-def msg(nome):
-    return f"Olá {nome} 👋\n\nSeu acesso está pendente.\nRegularize por favor."
-
-if clientes:
-
-    if st.button("📲 Gerar Cobranças"):
-
-        lista = []
-
-        for c in clientes:
-            try:
-                venc = datetime.strptime(c["vencimento"], "%d/%m/%Y").date()
-                if venc < hoje or c["status"] == "Pendente":
-                    lista.append(c)
-            except:
-                pass
-
-        st.session_state["cobranca"] = lista
-
-
-if "cobranca" in st.session_state:
-
-    lista = st.session_state["cobranca"]
-
-    st.success(f"{len(lista)} clientes na cobrança")
-
-    for c in lista:
-
-        whatsapp = str(c.get("whatsapp", "")).replace("+", "").replace(" ", "")
-
-        if whatsapp:
-            st.link_button(
-                f"📲 Cobrar {c['nome']}",
-                f"https://wa.me/55{whatsapp}?text={msg(c['nome'])}"
-            )
-
-    if st.button("🧹 Limpar Lista"):
-        del st.session_state["cobranca"]
-        st.rerun()
-
-
-# =========================
-# EXCLUSÃO EM MASSA
-# =========================
-
-st.divider()
-st.subheader("🗑️ Exclusão em Massa")
-
-if st.button("⚙️ Abrir / Fechar Exclusão em Massa"):
-    st.session_state["show_delete"] = not st.session_state["show_delete"]
-
-if st.session_state["show_delete"]:
-
-    st.warning("Modo de exclusão ativado")
-
-    selecionados = []
-
-    for i, c in enumerate(clientes):
-        col1, col2 = st.columns([0.1, 0.9])
-
-        with col1:
-            if st.checkbox("", key=f"del_{i}"):
-                selecionados.append(c)
-
-        with col2:
-            st.write(f"{c['nome']} | {c.get('whatsapp','')} | Telas: {c.get('telas',1)}")
-
-    if selecionados:
-
-        if st.button("🗑️ Excluir selecionados"):
-
-            for c in selecionados:
-                if c in clientes:
-                    clientes.remove(c)
-
-            ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
-            st.success("Excluídos com sucesso")
+# Criando abas para organizar a tela de forma profissional
+tab_lista, tab_cadastro, tab_importacao = st.tabs([
+    "📋 Lista de Clientes", 
+    "➕ Cadastrar Individual", 
+    "📥 Importação em Massa"
+])
+
+# ======================================
+# ABA 1: LISTA DE CLIENTES ATUAIS
+# ======================================
+with tab_lista:
+    st.subheader("Todos os Clientes Armazenados na Nuvem")
+    
+    if not df_clientes.empty:
+        # Mostra a tabela limpa para o usuário
+        st.dataframe(
+            df_clientes[["nome", "whatsapp", "vencimento", "status", "valor", "telas"]], 
+            use_container_width=True, 
+            hide_index=True
+        )
+        
+        st.divider()
+        
+        # Botão para ativar/desativar exclusão em massa
+        if st.button("🚨 Alternar Modo de Exclusão em Massa"):
+            st.session_state["show_delete"] = not st.session_state["show_delete"]
             st.rerun()
+            
+        if st.session_state["show_delete"]:
+            st.warning("⚠️ Atenção: A exclusão em massa removerá permanentemente os usuários selecionados do banco de dados.")
+            clientes_para_deletar = st.multiselect("Selecione os clientes que deseja apagar:", df_clientes["nome"].tolist())
+            
+            if st.button("❌ Confirmar Exclusão Definitiva"):
+                if clientes_para_deletar:
+                    with engine.begin() as conn:
+                        for nome in clientes_para_deletar:
+                            conn.execute(text("DELETE FROM vision_clientes WHERE nome = :nome"), {"nome": nome})
+                    st.success(f"Sucesso! {len(clientes_para_deletar)} clientes foram removidos.")
+                    st.cache_resource.clear()
+                    st.rerun()
+                else:
+                    st.info("Nenhum cliente foi selecionado para exclusão.")
+    else:
+        st.info("Nenhum cliente cadastrado no banco de dados ainda.")
 
+# ======================================
+# ABA 2: CADASTRO INDIVIDUAL
+# ======================================
+with tab_cadastro:
+    st.subheader("Inserir Novo Cliente Manualmente")
+    with st.form("form_individual", clear_on_submit=True):
+        nome = st.text_input("Nome do Cliente:")
+        whatsapp = st.text_input("WhatsApp (com DDD):")
+        vencimento = st.text_input("Data de Vencimento (Ex: 10/06/2026):", value=hoje.strftime("10/%m/%Y"))
+        status = st.selectbox("Status Inicial:", ["Em Dia", "Vencendo", "Vencidos"])
+        valor = st.number_input("Valor Mensal (R$):", min_value=0.0, value=25.0, step=5.0)
+        telas = st.number_input("Quantidade de Telas:", min_value=1, value=1, step=1)
+        
+        enviar = st.form_submit_button("💾 Salvar Cliente no Banco")
+        
+        if enviar:
+            if not nome.strip():
+                st.error("O campo Nome é obrigatório.")
+            else:
+                try:
+                    with engine.begin() as conn:
+                        conn.execute(text("""
+                            INSERT INTO vision_clientes (nome, whatsapp, vencimento, status, valor, telas)
+                            VALUES (:nome, :whatsapp, :vencimento, :status, :valor, :telas)
+                        """), {
+                            "nome": nome.strip(),
+                            "whatsapp": whatsapp.strip(),
+                            "vencimento": vencimento.strip(),
+                            "status": status,
+                            "valor": valor,
+                            "telas": int(telas)
+                        })
+                    st.success(f"Cliente '{nome}' cadastrado com sucesso na nuvem!")
+                    st.cache_resource.clear()
+                    st.rerun()
+                except Exception as e:
+                    st.error("Erro: Já existe um cliente com este nome cadastrado.")
 
-# =========================
-# EDIÇÃO (COM VALOR GARANTIDO ATUALIZADO)
-# =========================
+# ======================================
+# ABA 3: IMPORTAÇÃO EM MASSA (INTELIGENTE)
+# ======================================
+with tab_importacao:
+    st.subheader("Processamento Inteligente de Listas")
+    
+    texto = st.text_area("Cole aqui a sua lista de usuários / senhas / nomes (um por linha):", height=250, placeholder="Exemplo:\nMaria da Silva\nRejaneita:senha123\nJoão IPTV / Plano 2")
+    
+    c1, c2 = st.columns(2)
+    with c1:
+        valor_padrao = st.number_input("Valor Mensal Padrão (R$):", value=25.0, step=1.0)
+        venc_padrao = st.text_input("Vencimento Padrão:", value=hoje.strftime("10/%m/%Y"))
+    with c2:
+        telas_padrao = st.number_input("Telas Padrão:", min_value=1, value=1, step=1)
+        status_padrao = st.selectbox("Status Padrão:", ["Em Dia", "Vencendo", "Vencidos"])
 
-st.divider()
-st.subheader("✏️ Editar Cliente")
-
-clientes = carregar_clientes()  # 🔥 garante atualização
-
-if clientes:
-
-    nomes = [c["nome"] for c in clientes]
-    sel = st.selectbox("Cliente", nomes)
-
-    cli = next(c for c in clientes if c["nome"] == sel)
-
-    cli["nome"] = st.text_input("Nome", cli["nome"])
-    cli["whatsapp"] = st.text_input("WhatsApp", cli["whatsapp"])
-    cli["usuario"] = st.text_input("Usuário", cli["usuario"])
-    cli["senha"] = st.text_input("Senha", cli["senha"])
-
-    # 🔥 VALOR AGORA SEMPRE SINCRONIZADO COM A TABELA
-    cli["valor"] = st.number_input(
-        "Valor",
-        value=float(cli.get("valor", 0)),
-        step=1.0
-    )
-
-    cli["telas"] = st.number_input(
-        "Quantidade de Telas",
-        min_value=1,
-        value=int(cli.get("telas", 1)),
-        step=1
-    )
-
-    if st.button("Salvar"):
-
-        ARQ.write_text(json.dumps(clientes, indent=4, ensure_ascii=False), encoding="utf-8")
-
-        st.success("Atualizado")
-        st.rerun()
+    if st.button("🚀 Processar Importação Inteligente"):
+        if not texto.strip():
+            st.error("Por favor, cole algum texto na caixa acima para que o sistema possa processar.")
+        else:
+            linhas = texto.split("\n")
+            sucesso = 0
+            duplicados = 0
+            
+            with engine.begin() as conn:
+                for linha in linhas:
+                    linha_limpa = linha.strip()
+                    if not linha_limpa:
+                        continue
+                    
+                    # Mecanismo de Inteligência: Separa nomes limpos cortando dados extras (como senhas após dois pontos, barras, etc.)
+                    nome_extraido = linha_limpa
+                    for separador in [":", "/", "|", "-", ";"]:
+                        if separador in linha_limpa:
+                            partes = linha_limpa.split(separador)
+                            provisorio = partes[0].strip()
+                            # Evita pegar números puros como whatsapp no lugar do nome
+                            if provisorio and not provisorio.isdigit():
+                                nome_extraido = provisorio
+                                break
+                    
+                    nome_final = nome_extraido.strip()
+                    
+                    if nome_final:
+                        # Executa inserção ignorando duplicados (ON CONFLICT DO NOTHING)
+                        result = conn.execute(text("""
+                            INSERT INTO vision_clientes (nome, whatsapp, vencimento, status, valor, telas)
+                            VALUES (:nome, :whatsapp, :vencimento, :status, :valor, :telas)
+                            ON CONFLICT (nome) DO NOTHING
+                        """), {
+                            "nome": nome_final,
+                            "whatsapp": "",
+                            "vencimento": venc_padrao,
+                            "status": status_padrao,
+                            "valor": valor_padrao,
+                            "telas": int(telas_padrao)
+                        })
+                        
+                        # Se rowcount for maior que 0, significa que inseriu um novo registro
+                        if result.rowcount > 0:
+                            sucesso += 1
+                        else:
+                            duplicados += 1
+            
+            st.success(f"Importação concluída! {sucesso} novos clientes adicionados diretamente no banco de dados.")
+            if duplicados > 0:
+                st.info(f"Nota: {duplicados} nomes foram ignorados porque já constavam no sistema.")
+                
+            st.cache_resource.clear()
+            st.rerun()
