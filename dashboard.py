@@ -10,12 +10,9 @@ from sqlalchemy.pool import NullPool
 # Configuração da página - Expandida para mostrar o menu
 st.set_page_config(page_title="Vision Play TV", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
 
-# --- CSS PARA VISIBILIDADE 100% (ALTO CONTRASTE) E OCULTAR BOTÃO PADRÃO ---
+# --- CSS PARA VISIBILIDADE 100% (ALTO CONTRASTE) ---
 st.markdown("""
     <style>
-    /* Ocultar o botão de menu padrão do Streamlit */
-    [data-testid="stSidebarCollapseButton"] { display: none !important; }
-    
     /* Fundo Geral */
     .stApp { background-color: #0b0f19 !important; }
     
@@ -199,10 +196,6 @@ if not st.session_state["logado"]:
 
 USUARIO_LOGADO = st.session_state["usuario_nome"]
 ROLE_LOGADO = st.session_state["usuario_role"]
-
-# Botão customizado no topo
-if st.button("Menu ☰"):
-    st.sidebar.info("Navegação disponível ao lado")
 
 st.title("📊 Dashboard Vision Play TV")
 
