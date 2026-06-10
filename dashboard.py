@@ -7,13 +7,13 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
 
-# Configuração da página - Iniciamos com o sidebar como 'auto' ou 'expanded' para ser seu menu
+# Configuração da página
 st.set_page_config(page_title="Vision Play TV", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
 
 # --- CSS PARA LIMPEZA VISUAL E OCULTAR CABEÇALHO ---
 st.markdown("""
     <style>
-    /* Ocultar cabeçalho superior do Streamlit (onde fica o menu hambúrguer e GitHub) */
+    /* Ocultar cabeçalho superior do Streamlit */
     [data-testid="stAppHeader"] { display: none !important; }
     
     /* Fundo Geral */
@@ -24,6 +24,9 @@ st.markdown("""
         color: #ffffff !important; 
     }
     
+    /* Botão de Menu customizado (Zona Verde) */
+    .menu-button { margin-bottom: 10px; }
+
     /* Botões - Forçar estilo visível */
     button { 
         background-color: #3b82f6 !important; 
@@ -73,7 +76,6 @@ engine = get_engine()
 
 def inicializar_banco():
     with engine.begin() as conn:
-        # Tabela de Usuários
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS vision_usuarios (
                 id SERIAL PRIMARY KEY,
@@ -87,7 +89,6 @@ def inicializar_banco():
         conn.execute(text("ALTER TABLE vision_usuarios ADD COLUMN IF NOT EXISTS vencimento_usuario VARCHAR(50);"))
         conn.execute(text("UPDATE vision_usuarios SET vencimento_usuario = '31/12/2030' WHERE vencimento_usuario IS NULL;"))
         
-        # Garante o admin padrão
         total_usuarios = conn.execute(text("SELECT COUNT(*) FROM vision_usuarios")).scalar()
         if total_usuarios == 0:
             conn.execute(text("""
@@ -95,7 +96,6 @@ def inicializar_banco():
                 VALUES ('admin', 'admin123', 'ADM', 'Ativo', 'Final', '31/12/2030');
             """))
 
-        # Tabela de Clientes
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS vision_clientes (
                 id SERIAL PRIMARY KEY,
@@ -108,11 +108,8 @@ def inicializar_banco():
         """))
         conn.execute(text("ALTER TABLE vision_clientes ADD COLUMN IF NOT EXISTS telas INTEGER DEFAULT 1;"))
         conn.execute(text("ALTER TABLE vision_clientes ADD COLUMN IF NOT EXISTS usuario_owner VARCHAR(255) DEFAULT 'admin';"))
-        
-        # Garante que clientes antigos que não tinham dono (NULL) virem do 'admin'
         conn.execute(text("UPDATE vision_clientes SET usuario_owner = 'admin' WHERE usuario_owner IS NULL OR TRIM(usuario_owner) = '';"))
         
-        # Tabela de Histórico
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS vision_historico (
                 id SERIAL PRIMARY KEY,
@@ -199,7 +196,11 @@ if not st.session_state["logado"]:
 USUARIO_LOGADO = st.session_state["usuario_nome"]
 ROLE_LOGADO = st.session_state["usuario_role"]
 
-# Menu Lateral (Agora que o topo está limpo, ele é seu menu principal)
+# --- Botão de Menu (Zona Verde - Posicionado no corpo) ---
+if st.button("☰ Menu", key="btn_menu_custom"):
+    st.toast("Menu acessado")
+
+# Sidebar
 with st.sidebar:
     st.markdown("### 📋 Menu Principal")
     st.markdown(f"👤 **Usuário:** `{USUARIO_LOGADO}`")
@@ -245,7 +246,6 @@ def abrir_popup_limpeza():
                 """), {"padrao": f"%{data_limpar.strip()}%", "owner": USUARIO_LOGADO})
             st.rerun()
 
-# Controles do menu que antes estavam soltos no sidebar
 if ROLE_LOGADO == "ADM":
     if st.sidebar.button("🔄 Sincronizar Banco", use_container_width=True, key=f"sync_{USUARIO_LOGADO}"):
         st.rerun()
@@ -257,9 +257,7 @@ if st.sidebar.button("🚪 Sair", use_container_width=True, key=f"exit_{USUARIO_
     st.session_state.clear()
     st.rerun()
 
-# ======================================
-# CÁLCULOS DO PAINEL
-# ======================================
+# --- CÁLCULOS DO PAINEL ---
 total_clientes = len(clientes)
 em_dia, vencendo, vencidos = 0, 0, 0
 receita_prevista, receita_recebida = 0, 0
@@ -279,7 +277,6 @@ for item in historico:
 
 receita_pendente = receita_prevista - receita_recebida
 
-# CONTAINER DE MÉTRICAS
 with st.container():
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("👥 Seus Clientes", total_clientes)
@@ -303,7 +300,6 @@ with col2:
 
 st.divider()
 
-# ABA DE GESTÃO
 st.subheader("⚙️ Gerenciamento do Sistema")
 abas_disponiveis = ["💵 Registrar Pagamento", "➕ Novo Cliente", "✏️ Editar / Excluir"]
 if ROLE_LOGADO == "ADM": abas_disponiveis.append("👤 Painel ADM (Contas)")
