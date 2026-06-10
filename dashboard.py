@@ -10,93 +10,72 @@ from sqlalchemy.pool import NullPool
 # Configuração da página - Iniciada como collapsed para o seu botão gerenciar
 st.set_page_config(page_title="Vision Play TV", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
 
-# --- CSS REENGENHARADO PARA 100% DE VISIBILIDADE E ALTO CONTRASTE ---
+# --- CSS EXTRA FORTE PARA VISIBILIDADE 100% E REMOÇÃO DE MENUS NATIVOS ---
 st.markdown("""
     <style>
-    /* Ocultar o botão de menu padrão do Streamlit */
-    [data-testid="stSidebarCollapseButton"] { display: none !important; }
+    /* 1. OCULTAR COMPLETAMENTE O BOTÃO LATERAL (>>), CÁBEÇALHO E BARRA SUPERIOR */
+    [data-testid="stHeader"], 
+    [data-testid="stSidebarCollapseButton"], 
+    .stAppHeader, 
+    header, 
+    button[aria-label="Expand sidebar"],
+    button[data-testid="stSidebarCollapseButton"] {
+        display: none !important;
+    }
     
-    /* Fundo Geral do App */
-    .stApp { background-color: #0f172a !important; }
+    /* 2. FUNDO GERAL DO APLICATIVO */
+    .stApp { background-color: #0b0f19 !important; }
     
-    /* Títulos e Textos Principais com Contraste Máximo */
-    h1, h2, h3, h4, h5, h6 { color: #ffffff !important; font-weight: 700 !important; }
-    p, label, .stMarkdown { color: #f1f5f9 !important; font-size: 15px !important; }
+    /* 3. CONTRASTE MÁXIMO PARA TEXTOS, TÍTULOS E LABELS */
+    h1, h2, h3, h4, h5, h6 { color: #ffffff !important; font-weight: bold !important; }
+    p, span, label, .stMarkdown, [data-testid="stWidgetLabel"] p { color: #f1f5f9 !important; font-size: 15px !important; }
     
-    /* Botões Ultra Visíveis (Azul Elétrico com Borda) */
-    .stButton > button { 
+    /* 4. BOTÕES TOTALMENTE VISÍVEIS (AZUL ELÉTRICO COM BORDA BRILHANTE) */
+    button, .stButton > button { 
         background-color: #2563eb !important; 
         color: #ffffff !important; 
         font-weight: bold !important;
         border: 2px solid #60a5fa !important;
         border-radius: 6px !important;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3) !important;
-        transition: all 0.2s ease-in-out;
+        padding: 0.6rem 1.2rem !important;
     }
-    .stButton > button:hover {
+    button:hover, .stButton > button:hover {
         background-color: #1d4ed8 !important;
         border-color: #93c5fd !important;
-        color: #ffffff !important;
     }
     
-    /* Inputs de Texto Corrigidos */
-    .stTextInput input { 
-        background-color: #1e293b !important; 
-        color: #ffffff !important; 
-        border: 2px solid #475569 !important; 
+    /* 5. INPUTS E CAIXAS DE SELEÇÃO AJUSTADOS (SEM TEXTO INVISÍVEL) */
+    input, select, textarea, div[data-baseweb="select"] {
+        background-color: #1e293b !important;
+        color: #ffffff !important;
+        border: 2px solid #475569 !important;
         border-radius: 6px !important;
     }
+    .stTextInput input { color: #ffffff !important; background-color: #1e293b !important; }
+    div[data-baseweb="select"] * { color: #ffffff !important; }
     
-    /* Caixas de Seleção (Dropdowns) Corrigidas contra texto invisível */
-    div[data-baseweb="select"] > div {
-        background-color: #1e293b !important;
-        border: 2px solid #475569 !important;
-    }
-    div[data-baseweb="select"] span {
-        color: #ffffff !important;
-    }
-    /* Lista de opções do dropdown */
-    ul[role="listbox"] {
-        background-color: #1e293b !important;
-    }
-    ul[role="listbox"] li {
-        color: #ffffff !important;
-        background-color: #1e293b !important;
-    }
-    ul[role="listbox"] li:hover {
-        background-color: #334155 !important;
-    }
-    
-    /* Blocos de Métricas Destacados */
+    /* 6. MÉTRICAS DESTACADAS */
     [data-testid="stMetric"] { 
         background-color: #1e293b !important; 
-        padding: 20px !important; 
+        padding: 18px !important; 
         border-radius: 10px !important; 
         border: 2px solid #334155 !important; 
     }
     [data-testid="stMetricValue"] > div { color: #38bdf8 !important; font-weight: 800 !important; }
     [data-testid="stMetricLabel"] > div { color: #94a3b8 !important; font-weight: bold !important; }
     
-    /* Abas Visíveis e Modernas */
+    /* 7. ABAS DO GERENCIAMENTO */
     .stTabs [data-baseweb="tab-list"] { gap: 10px; }
     .stTabs [data-baseweb="tab"] { 
         background-color: #1e293b !important; 
-        color: #94a3b8 !important; 
-        border: 1px solid #334155 !important;
-        border-radius: 4px 4px 0 0 !important;
-        padding: 8px 16px !important;
+        color: #ffffff !important; 
+        border: 1px solid #475569 !important;
+        border-radius: 6px 6px 0 0 !important;
     }
     .stTabs [aria-selected="true"] { 
         background-color: #2563eb !important; 
         color: #ffffff !important; 
         font-weight: bold !important;
-        border-color: #60a5fa !important;
-    }
-
-    /* Popover do Menu */
-    div[data-testid="stPopoverBody"] {
-        background-color: #1e293b !important;
-        border: 2px solid #475569 !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -182,7 +161,6 @@ if "logado" not in st.session_state:
 if not st.session_state["logado"]:
     st.markdown("""
         <style>
-            .stAppHeader { display: none !important; }
             [data-testid="stMainBlockContainer"] {
                 max-width: 520px !important;
                 margin: 0 auto !important;
@@ -248,7 +226,6 @@ with st.popover("Menu"):
     st.markdown(f"🎖️ **Nível:** `{ROLE_LOGADO}`")
     st.divider()
     
-    # Lógica do antigo sidebar dentro do popover
     if ROLE_LOGADO == "ADM":
         if st.button("🔄 Sincronizar Banco", use_container_width=True, key=f"sync_{USUARIO_LOGADO}"):
             st.rerun()
@@ -301,9 +278,7 @@ if st.session_state.get("abrir_limpeza"):
                 st.session_state["abrir_limpeza"] = False
                 st.rerun()
 
-# ======================================
 # CÁLCULOS DO PAINEL
-# ======================================
 total_clientes = len(clientes)
 em_dia, vencendo, vencidos = 0, 0, 0
 receita_prevista, receita_recebida = 0, 0
@@ -347,22 +322,45 @@ with col2:
 
 st.divider()
 
-# --- SITUAÇÃO DOS CLIENTES COM PALETA DE ALTO CONTRASTE ---
+# --- TABELA DE CLIENTES EM HTML IMUNE A FALHAS DE TEMA (100% VISÍVEL) ---
 st.subheader("📋 Lista de Clientes e Situação")
 if clientes:
-    df_cli = pd.DataFrame(clientes)[["nome", "whatsapp", "vencimento", "status", "valor", "telas"]]
-    df_cli.columns = ["Nome", "WhatsApp", "Vencimento", "Status", "Valor (R$)", "Telas"]
-    
-    def aplicar_cores_linhas(row):
-        status = str(row["Status"]).strip().lower()
-        if status in ["recebido", "em dia"]:
-            # Verde esmeralda bem definido para leitura perfeita com texto branco
-            return ["background-color: #065f46 !important; color: #ffffff !important; font-weight: bold; border-bottom: 1px solid #10b981;"] * len(row)
+    html_table = """
+    <div style="overflow-x:auto; background-color: #111827; padding: 10px; border-radius: 8px;">
+        <table style="width:100%; border-collapse: collapse; color: #ffffff; font-family: sans-serif; text-align: left;">
+            <thead>
+                <tr style="background-color: #1e293b; border-bottom: 3px solid #475569;">
+                    <th style="padding: 14px; color: #ffffff; font-weight: bold;">Nome</th>
+                    <th style="padding: 14px; color: #ffffff; font-weight: bold;">WhatsApp</th>
+                    <th style="padding: 14px; color: #ffffff; font-weight: bold;">Vencimento</th>
+                    <th style="padding: 14px; color: #ffffff; font-weight: bold;">Status</th>
+                    <th style="padding: 14px; color: #ffffff; font-weight: bold;">Valor</th>
+                    <th style="padding: 14px; color: #ffffff; font-weight: bold;">Telas</th>
+                </tr>
+            </thead>
+            <tbody>
+    """
+    for c in clientes:
+        status_lower = str(c["status"]).strip().lower()
+        if status_lower in ["recebido", "em dia"]:
+            bg_color = "#065f46"  # Verde Esmeralda Escuro
+            border_color = "#10b981"
         else:
-            # Laranja/âmbar queimado de alta visibilidade com texto branco
-            return ["background-color: #9a3412 !important; color: #ffffff !important; font-weight: bold; border-bottom: 1px solid #f97316;"] * len(row)
-
-    st.dataframe(df_cli.style.apply(aplicar_cores_linhas, axis=1), use_container_width=True, hide_index=True)
+            bg_color = "#9a3412"  # Laranja Queimado Escuro
+            border_color = "#f97316"
+            
+        html_table += f"""
+            <tr style="background-color: {bg_color}; border-bottom: 2px solid {border_color}; font-weight: bold;">
+                <td style="padding: 14px; color: #ffffff !important;">{c['nome']}</td>
+                <td style="padding: 14px; color: #ffffff !important;">{c['whatsapp']}</td>
+                <td style="padding: 14px; color: #ffffff !important;">{c['vencimento']}</td>
+                <td style="padding: 14px; color: #ffffff !important;">{c['status']}</td>
+                <td style="padding: 14px; color: #ffffff !important;">R$ {c['valor']:.2f}</td>
+                <td style="padding: 14px; color: #ffffff !important;">{c['telas']}</td>
+            </tr>
+        """
+    html_table += "</tbody></table></div>"
+    st.markdown(html_table, unsafe_allow_html=True)
 else:
     st.info("Nenhum cliente cadastrado.")
 
@@ -447,9 +445,60 @@ if ROLE_LOGADO == "ADM":
         st.divider()
         with engine.connect() as conn:
             df_users = pd.DataFrame(conn.execute(text("SELECT id, username, password, role, status, vencimento_usuario FROM vision_usuarios")).mappings().fetchall())
-        if not df_users.empty: st.dataframe(df_users, hide_index=True)
+        if not df_users.empty:
+            html_users = """
+            <div style="overflow-x:auto; background-color: #111827; padding: 10px; border-radius: 8px;">
+                <table style="width:100%; border-collapse: collapse; color: #ffffff; font-family: sans-serif; text-align: left;">
+                    <thead>
+                        <tr style="background-color: #1e293b; border-bottom: 2px solid #475569;">
+                            <th style="padding: 10px; color: #ffffff;">ID</th>
+                            <th style="padding: 10px; color: #ffffff;">Usuário</th>
+                            <th style="padding: 10px; color: #ffffff;">Senha</th>
+                            <th style="padding: 10px; color: #ffffff;">Nível</th>
+                            <th style="padding: 10px; color: #ffffff;">Status</th>
+                            <th style="padding: 10px; color: #ffffff;">Vencimento</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            """
+            for idx, row in df_users.iterrows():
+                html_users += f"""
+                    <tr style="border-bottom: 1px solid #334155;">
+                        <td style="padding: 10px; color: #ffffff !important;">{row['id']}</td>
+                        <td style="padding: 10px; color: #ffffff !important;">{row['username']}</td>
+                        <td style="padding: 10px; color: #ffffff !important;">{row['password']}</td>
+                        <td style="padding: 10px; color: #ffffff !important;">{row['role']}</td>
+                        <td style="padding: 10px; color: #ffffff !important;">{row['status']}</td>
+                        <td style="padding: 10px; color: #ffffff !important;">{row['vencimento_usuario']}</td>
+                    </tr>
+                """
+            html_users += "</tbody></table></div>"
+            st.markdown(html_users, unsafe_allow_html=True)
 
 st.divider()
 st.subheader("💵 Seus Últimos Recebimentos")
-if historico: st.dataframe(pd.DataFrame(list(reversed(historico))[:10]), use_container_width=True, hide_index=True)
-else: st.info("Nenhum registro seu.")
+if historico:
+    html_hist = """
+    <div style="overflow-x:auto; background-color: #111827; padding: 10px; border-radius: 8px;">
+        <table style="width:100%; border-collapse: collapse; color: #ffffff; font-family: sans-serif; text-align: left;">
+            <thead>
+                <tr style="background-color: #1e293b; border-bottom: 2px solid #475569;">
+                    <th style="padding: 10px; color: #ffffff;">Cliente</th>
+                    <th style="padding: 10px; color: #ffffff;">Valor</th>
+                    <th style="padding: 10px; color: #ffffff;">Data</th>
+                </tr>
+            </thead>
+            <tbody>
+    """
+    for item in list(reversed(historico))[:10]:
+        html_hist += f"""
+            <tr style="border-bottom: 1px solid #334155;">
+                <td style="padding: 10px; color: #ffffff !important;">{item['cliente']}</td>
+                <td style="padding: 10px; color: #ffffff !important;">R$ {item['valor']:.2f}</td>
+                <td style="padding: 10px; color: #ffffff !important;">{item['data']}</td>
+            </tr>
+        """
+    html_hist += "</tbody></table></div>"
+    st.markdown(html_hist, unsafe_allow_html=True)
+else: 
+    st.info("Nenhum registro seu.")
