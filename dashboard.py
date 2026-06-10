@@ -10,47 +10,94 @@ from sqlalchemy.pool import NullPool
 # Configuração da página - Iniciada como collapsed para o seu botão gerenciar
 st.set_page_config(page_title="Vision Play TV", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
 
-# --- CSS PARA VISIBILIDADE 100% E OCULTAR BOTÃO PADRÃO ---
+# --- CSS REENGENHARADO PARA 100% DE VISIBILIDADE E ALTO CONTRASTE ---
 st.markdown("""
     <style>
     /* Ocultar o botão de menu padrão do Streamlit */
     [data-testid="stSidebarCollapseButton"] { display: none !important; }
     
-    /* Fundo Geral */
-    .stApp { background-color: #0b0f19 !important; }
+    /* Fundo Geral do App */
+    .stApp { background-color: #0f172a !important; }
     
-    /* Forçar todo o texto a ser branco ou visível */
-    h1, h2, h3, h4, p, div, label, span, .stMetric, .stMarkdown, .stTab, .stSelectbox, .stTextInput { 
-        color: #ffffff !important; 
-    }
+    /* Títulos e Textos Principais com Contraste Máximo */
+    h1, h2, h3, h4, h5, h6 { color: #ffffff !important; font-weight: 700 !important; }
+    p, label, .stMarkdown { color: #f1f5f9 !important; font-size: 15px !important; }
     
-    /* Botões - Forçar estilo visível */
-    button { 
-        background-color: #3b82f6 !important; 
+    /* Botões Ultra Visíveis (Azul Elétrico com Borda) */
+    .stButton > button { 
+        background-color: #2563eb !important; 
         color: #ffffff !important; 
         font-weight: bold !important;
-        border: 1px solid #60a5fa !important;
+        border: 2px solid #60a5fa !important;
+        border-radius: 6px !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3) !important;
+        transition: all 0.2s ease-in-out;
+    }
+    .stButton > button:hover {
+        background-color: #1d4ed8 !important;
+        border-color: #93c5fd !important;
+        color: #ffffff !important;
     }
     
-    /* Inputs e Caixas de Texto */
-    .stTextInput input, .stSelectbox div { 
+    /* Inputs de Texto Corrigidos */
+    .stTextInput input { 
         background-color: #1e293b !important; 
         color: #ffffff !important; 
-        border: 1px solid #475569 !important; 
+        border: 2px solid #475569 !important; 
+        border-radius: 6px !important;
     }
     
-    /* Métricas */
+    /* Caixas de Seleção (Dropdowns) Corrigidas contra texto invisível */
+    div[data-baseweb="select"] > div {
+        background-color: #1e293b !important;
+        border: 2px solid #475569 !important;
+    }
+    div[data-baseweb="select"] span {
+        color: #ffffff !important;
+    }
+    /* Lista de opções do dropdown */
+    ul[role="listbox"] {
+        background-color: #1e293b !important;
+    }
+    ul[role="listbox"] li {
+        color: #ffffff !important;
+        background-color: #1e293b !important;
+    }
+    ul[role="listbox"] li:hover {
+        background-color: #334155 !important;
+    }
+    
+    /* Blocos de Métricas Destacados */
     [data-testid="stMetric"] { 
         background-color: #1e293b !important; 
-        padding: 15px !important; 
+        padding: 20px !important; 
         border-radius: 10px !important; 
-        border: 1px solid #334155 !important; 
+        border: 2px solid #334155 !important; 
     }
+    [data-testid="stMetricValue"] > div { color: #38bdf8 !important; font-weight: 800 !important; }
+    [data-testid="stMetricLabel"] > div { color: #94a3b8 !important; font-weight: bold !important; }
     
-    /* Abas */
+    /* Abas Visíveis e Modernas */
     .stTabs [data-baseweb="tab-list"] { gap: 10px; }
-    .stTabs [data-baseweb="tab"] { background-color: #1e293b !important; color: #ffffff !important; }
-    .stTabs [aria-selected="true"] { background-color: #3b82f6 !important; color: #ffffff !important; }
+    .stTabs [data-baseweb="tab"] { 
+        background-color: #1e293b !important; 
+        color: #94a3b8 !important; 
+        border: 1px solid #334155 !important;
+        border-radius: 4px 4px 0 0 !important;
+        padding: 8px 16px !important;
+    }
+    .stTabs [aria-selected="true"] { 
+        background-color: #2563eb !important; 
+        color: #ffffff !important; 
+        font-weight: bold !important;
+        border-color: #60a5fa !important;
+    }
+
+    /* Popover do Menu */
+    div[data-testid="stPopoverBody"] {
+        background-color: #1e293b !important;
+        border: 2px solid #475569 !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -146,7 +193,7 @@ if not st.session_state["logado"]:
     
     with st.form("form_login", clear_on_submit=True):
         st.markdown("<h2 style='text-align: center;'>🔒 Vision Play TV</h2>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align: center; color: #ffffff !important; font-size: 14px;'>Insira suas credenciais</p>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; color: #f1f5f9 !important; font-size: 14px;'>Insira suas credenciais</p>", unsafe_allow_html=True)
         
         user_input = st.text_input("Usuário:").strip().lower()
         pass_input = st.text_input("Senha:", type="password").strip()
@@ -300,7 +347,8 @@ with col2:
 
 st.divider()
 
-# --- ATUALIZAÇÃO SOLICITADA: SITUAÇÃO DOS CLIENTES COLORIDA ---
+# --- SITUAÇÃO DOS CLIENTES COM PALETA DE ALTO CONTRASTE ---
+st.subheader("📋 Lista de Clientes e Situação")
 if clientes:
     df_cli = pd.DataFrame(clientes)[["nome", "whatsapp", "vencimento", "status", "valor", "telas"]]
     df_cli.columns = ["Nome", "WhatsApp", "Vencimento", "Status", "Valor (R$)", "Telas"]
@@ -308,13 +356,15 @@ if clientes:
     def aplicar_cores_linhas(row):
         status = str(row["Status"]).strip().lower()
         if status in ["recebido", "em dia"]:
-            # Linha verde para quem pagou / está em dia
-            return ["background-color: #14532d !important; color: #ffffff !important; font-weight: bold;"] * len(row)
+            # Verde esmeralda bem definido para leitura perfeita com texto branco
+            return ["background-color: #065f46 !important; color: #ffffff !important; font-weight: bold; border-bottom: 1px solid #10b981;"] * len(row)
         else:
-            # Linha amarela para quem está pendente (vencendo/vencido)
-            return ["background-color: #713f12 !important; color: #ffffff !important; font-weight: bold;"] * len(row)
+            # Laranja/âmbar queimado de alta visibilidade com texto branco
+            return ["background-color: #9a3412 !important; color: #ffffff !important; font-weight: bold; border-bottom: 1px solid #f97316;"] * len(row)
 
     st.dataframe(df_cli.style.apply(aplicar_cores_linhas, axis=1), use_container_width=True, hide_index=True)
+else:
+    st.info("Nenhum cliente cadastrado.")
 
 st.divider()
 
