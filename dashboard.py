@@ -178,7 +178,7 @@ if not st.session_state["logado"]:
     st.stop()
 
 # ==============================================================================
-# ÁREA DO DASHBOARD (TOTALMENTE ISOLADA)
+# ÁREA DO DASHBOARD
 # ==============================================================================
 
 USUARIO_LOGADO = st.session_state["usuario_nome"]
@@ -297,7 +297,8 @@ with abas[0]:
         sel = st.selectbox("Escolha o Cliente:", [c["nome"] for c in clientes], key=f"sel_pag_{USUARIO_LOGADO}")
         cli = next(c for c in clientes if c["nome"] == sel)
         st.markdown(f"💰 **Mensalidade:** `R$ {float(cli.get('valor', 25.0)):.2f}`")
-        if st.button("⚡ Confirmar Pagamento" background: blue, key=f"btn_pag_{USUARIO_LOGADO}"):
+        # LINHA CORRIGIDA ABAIXO
+        if st.button("⚡ Confirmar Pagamento", key=f"btn_pag_{USUARIO_LOGADO}"):
             novo_mes = hoje.month + 1 if hoje.day > 10 else hoje.month
             novo_ano = hoje.year + (1 if novo_mes > 12 else 0)
             novo_mes = 1 if novo_mes > 12 else novo_mes
