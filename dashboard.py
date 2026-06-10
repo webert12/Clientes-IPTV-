@@ -201,6 +201,7 @@ with st.popover("Menu"):
     st.markdown(f"🎖️ **Nível:** `{ROLE_LOGADO}`")
     st.divider()
     
+    # Lógica do antigo sidebar dentro do popover
     if ROLE_LOGADO == "ADM":
         if st.button("🔄 Sincronizar Banco", use_container_width=True, key=f"sync_{USUARIO_LOGADO}"):
             st.rerun()
@@ -299,27 +300,24 @@ with col2:
 
 st.divider()
 
-# ======================================
-# TABELA DE SITUAÇÃO DOS CLIENTES (COLORIDA)
-# ======================================
-st.subheader("👥 Situação Geral dos Clientes")
+# --- TABELA DE LISTAGEM DE CLIENTES COM CORES DINÂMICAS ---
+st.subheader("📋 Lista de Clientes e Situação")
 if clientes:
     df_cli = pd.DataFrame(clientes)
     df_cli.columns = ["Nome", "WhatsApp", "Vencimento", "Status", "Valor (R$)", "Telas"]
     
-    # Função que define a cor de fundo baseado no status de pagamento
-    def estilizar_linhas_clientes(row):
+    def aplicar_cor_linha(row):
         status = str(row["Status"]).strip().lower()
         if status in ["recebido", "em dia"]:
-            # Verde escuro/médio confortável para leitura com texto branco
+            # Verde escuro legível com texto branco
             return ["background-color: #14532d !important; color: #ffffff !important; font-weight: bold;"] * len(row)
         else:
-            # Amarelo/Âmbar escuro confortável para leitura com texto branco
+            # Amarelo/âmbar escuro legível com texto branco
             return ["background-color: #713f12 !important; color: #ffffff !important; font-weight: bold;"] * len(row)
 
-    st.dataframe(df_cli.style.apply(estilizar_linhas_clientes, axis=1), use_container_width=True, hide_index=True)
+    st.dataframe(df_cli.style.apply(aplicar_cor_linha, axis=1), use_container_width=True, hide_index=True)
 else:
-    st.info("Nenhum cliente cadastrado ainda.")
+    st.info("Nenhum cliente cadastrado.")
 
 st.divider()
 
