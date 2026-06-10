@@ -7,12 +7,15 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
 
-# Configuração da página - Expandida para mostrar o menu
+# Configuração da página - Iniciamos com o sidebar como 'auto' ou 'expanded' para ser seu menu
 st.set_page_config(page_title="Vision Play TV", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
 
-# --- CSS PARA VISIBILIDADE 100% (ALTO CONTRASTE) ---
+# --- CSS PARA LIMPEZA VISUAL E OCULTAR CABEÇALHO ---
 st.markdown("""
     <style>
+    /* Ocultar cabeçalho superior do Streamlit (onde fica o menu hambúrguer e GitHub) */
+    [data-testid="stAppHeader"] { display: none !important; }
+    
     /* Fundo Geral */
     .stApp { background-color: #0b0f19 !important; }
     
@@ -138,7 +141,6 @@ if not st.session_state["logado"]:
             [data-testid="stSidebar"] { display: none !important; width: 0px !important; }
             [data-testid="stSidebarCollapseButton"] { display: none !important; }
             .collapsedControl { display: none !important; }
-            .stAppHeader { display: none !important; }
             [data-testid="stMainBlockContainer"] {
                 max-width: 520px !important;
                 margin: 0 auto !important;
@@ -197,13 +199,14 @@ if not st.session_state["logado"]:
 USUARIO_LOGADO = st.session_state["usuario_nome"]
 ROLE_LOGADO = st.session_state["usuario_role"]
 
-st.title("📊 Dashboard Vision Play TV")
+# Menu Lateral (Agora que o topo está limpo, ele é seu menu principal)
+with st.sidebar:
+    st.markdown("### 📋 Menu Principal")
+    st.markdown(f"👤 **Usuário:** `{USUARIO_LOGADO}`")
+    st.markdown(f"🎖️ **Nível:** `{ROLE_LOGADO}`")
+    st.divider()
 
-# Sidebar com título e informações
-st.sidebar.markdown("### 📋 Menu Principal")
-st.sidebar.markdown(f"👤 **Usuário:** `{USUARIO_LOGADO}`")
-st.sidebar.markdown(f"🎖️ **Nível:** `{ROLE_LOGADO}`")
-st.sidebar.divider()
+st.title("📊 Dashboard Vision Play TV")
 
 def carregar_dados_privados(dono_da_conta):
     with engine.connect() as conn:
@@ -242,6 +245,7 @@ def abrir_popup_limpeza():
                 """), {"padrao": f"%{data_limpar.strip()}%", "owner": USUARIO_LOGADO})
             st.rerun()
 
+# Controles do menu que antes estavam soltos no sidebar
 if ROLE_LOGADO == "ADM":
     if st.sidebar.button("🔄 Sincronizar Banco", use_container_width=True, key=f"sync_{USUARIO_LOGADO}"):
         st.rerun()
