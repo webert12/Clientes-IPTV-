@@ -7,14 +7,14 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
 
-# Configuração da página
-st.set_page_config(page_title="Vision Play TV", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
+# Configuração da página - Iniciada como collapsed para o seu botão gerenciar
+st.set_page_config(page_title="Vision Play TV", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
 
-# --- CSS PARA LIMPEZA VISUAL E OCULTAR CABEÇALHO ---
+# --- CSS PARA VISIBILIDADE 100% E OCULTAR BOTÃO PADRÃO ---
 st.markdown("""
     <style>
-    /* Ocultar cabeçalho superior do Streamlit */
-    [data-testid="stAppHeader"] { display: none !important; }
+    /* Ocultar o botão de menu padrão do Streamlit */
+    [data-testid="stSidebarCollapseButton"] { display: none !important; }
     
     /* Fundo Geral */
     .stApp { background-color: #0b0f19 !important; }
@@ -24,9 +24,6 @@ st.markdown("""
         color: #ffffff !important; 
     }
     
-    /* Botão de Menu customizado (Zona Verde) */
-    .menu-button { margin-bottom: 10px; }
-
     /* Botões - Forçar estilo visível */
     button { 
         background-color: #3b82f6 !important; 
@@ -49,9 +46,6 @@ st.markdown("""
         border-radius: 10px !important; 
         border: 1px solid #334155 !important; 
     }
-    
-    /* Sidebar */
-    [data-testid="stSidebar"] { background-color: #020617 !important; }
     
     /* Abas */
     .stTabs [data-baseweb="tab-list"] { gap: 10px; }
@@ -76,6 +70,7 @@ engine = get_engine()
 
 def inicializar_banco():
     with engine.begin() as conn:
+        # Tabela de Usuários
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS vision_usuarios (
                 id SERIAL PRIMARY KEY,
@@ -89,6 +84,7 @@ def inicializar_banco():
         conn.execute(text("ALTER TABLE vision_usuarios ADD COLUMN IF NOT EXISTS vencimento_usuario VARCHAR(50);"))
         conn.execute(text("UPDATE vision_usuarios SET vencimento_usuario = '31/12/2030' WHERE vencimento_usuario IS NULL;"))
         
+        # Garante o admin padrão
         total_usuarios = conn.execute(text("SELECT COUNT(*) FROM vision_usuarios")).scalar()
         if total_usuarios == 0:
             conn.execute(text("""
@@ -96,6 +92,7 @@ def inicializar_banco():
                 VALUES ('admin', 'admin123', 'ADM', 'Ativo', 'Final', '31/12/2030');
             """))
 
+        # Tabela de Clientes
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS vision_clientes (
                 id SERIAL PRIMARY KEY,
@@ -108,8 +105,11 @@ def inicializar_banco():
         """))
         conn.execute(text("ALTER TABLE vision_clientes ADD COLUMN IF NOT EXISTS telas INTEGER DEFAULT 1;"))
         conn.execute(text("ALTER TABLE vision_clientes ADD COLUMN IF NOT EXISTS usuario_owner VARCHAR(255) DEFAULT 'admin';"))
+        
+        # Garante que clientes antigos que não tinham dono (NULL) virem do 'admin'
         conn.execute(text("UPDATE vision_clientes SET usuario_owner = 'admin' WHERE usuario_owner IS NULL OR TRIM(usuario_owner) = '';"))
         
+        # Tabela de Histórico
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS vision_historico (
                 id SERIAL PRIMARY KEY,
@@ -135,9 +135,7 @@ if "logado" not in st.session_state:
 if not st.session_state["logado"]:
     st.markdown("""
         <style>
-            [data-testid="stSidebar"] { display: none !important; width: 0px !important; }
-            [data-testid="stSidebarCollapseButton"] { display: none !important; }
-            .collapsedControl { display: none !important; }
+            .stAppHeader { display: none !important; }
             [data-testid="stMainBlockContainer"] {
                 max-width: 520px !important;
                 margin: 0 auto !important;
@@ -196,16 +194,23 @@ if not st.session_state["logado"]:
 USUARIO_LOGADO = st.session_state["usuario_nome"]
 ROLE_LOGADO = st.session_state["usuario_role"]
 
-# --- Botão de Menu (Zona Verde - Posicionado no corpo) ---
-if st.button("☰ Menu", key="btn_menu_custom"):
-    st.toast("Menu acessado")
-
-# Sidebar
-with st.sidebar:
+# MENU CUSTOMIZADO
+with st.popover("Menu"):
     st.markdown("### 📋 Menu Principal")
     st.markdown(f"👤 **Usuário:** `{USUARIO_LOGADO}`")
     st.markdown(f"🎖️ **Nível:** `{ROLE_LOGADO}`")
     st.divider()
+    
+    if ROLE_LOGADO == "ADM":
+        if st.button("🔄 Sincronizar Banco", use_container_width=True, key=f"sync_{USUARIO_LOGADO}"):
+            st.rerun()
+
+    if st.button("🧹 Limpar Histórico", use_container_width=True, key=f"clean_{USUARIO_LOGADO}"):
+        st.session_state["abrir_limpeza"] = True
+    
+    if st.button("🚪 Sair", use_container_width=True, key=f"exit_{USUARIO_LOGADO}"):
+        st.session_state.clear()
+        st.rerun()
 
 st.title("📊 Dashboard Vision Play TV")
 
@@ -231,33 +236,26 @@ def carregar_dados_privados(dono_da_conta):
 
 clientes, historico = carregar_dados_privados(USUARIO_LOGADO)
 
-@st.dialog("🧹 Zerar Período")
-def abrir_popup_limpeza():
-    st.write("Digite o **Dia/Mês** dos seus recebimentos que deseja limpar.")
-    data_limpar = st.text_input("Data (Ex: 10/06 ou /06):", value=hoje.strftime("%d/%m"), key=f"inp_cl_{USUARIO_LOGADO}")
-    st.warning("⚠️ Isso apagará APENAS os seus registros desta data!")
+# Popup de Limpeza
+if st.session_state.get("abrir_limpeza"):
+    with st.dialog("🧹 Zerar Período"):
+        st.write("Digite o **Dia/Mês** dos seus recebimentos que deseja limpar.")
+        data_limpar = st.text_input("Data (Ex: 10/06 ou /06):", value=hoje.strftime("%d/%m"), key=f"inp_cl_{USUARIO_LOGADO}")
+        st.warning("⚠️ Isso apagará APENAS os seus registros desta data!")
 
-    if st.button("🔥 Confirmar", use_container_width=True, key=f"btn_cl_{USUARIO_LOGADO}"):
-        if data_limpar.strip():
-            with engine.begin() as conn:
-                conn.execute(text("""
-                    DELETE FROM vision_historico 
-                    WHERE data LIKE :padrao AND TRIM(LOWER(usuario_owner)) = TRIM(LOWER(:owner))
-                """), {"padrao": f"%{data_limpar.strip()}%", "owner": USUARIO_LOGADO})
-            st.rerun()
+        if st.button("🔥 Confirmar", use_container_width=True, key=f"btn_cl_{USUARIO_LOGADO}"):
+            if data_limpar.strip():
+                with engine.begin() as conn:
+                    conn.execute(text("""
+                        DELETE FROM vision_historico 
+                        WHERE data LIKE :padrao AND TRIM(LOWER(usuario_owner)) = TRIM(LOWER(:owner))
+                    """), {"padrao": f"%{data_limpar.strip()}%", "owner": USUARIO_LOGADO})
+                st.session_state["abrir_limpeza"] = False
+                st.rerun()
 
-if ROLE_LOGADO == "ADM":
-    if st.sidebar.button("🔄 Sincronizar Banco", use_container_width=True, key=f"sync_{USUARIO_LOGADO}"):
-        st.rerun()
-
-if st.sidebar.button("🧹 Limpar Histórico", use_container_width=True, key=f"clean_{USUARIO_LOGADO}"):
-    abrir_popup_limpeza()
-
-if st.sidebar.button("🚪 Sair", use_container_width=True, key=f"exit_{USUARIO_LOGADO}"):
-    st.session_state.clear()
-    st.rerun()
-
-# --- CÁLCULOS DO PAINEL ---
+# ======================================
+# CÁLCULOS DO PAINEL
+# ======================================
 total_clientes = len(clientes)
 em_dia, vencendo, vencidos = 0, 0, 0
 receita_prevista, receita_recebida = 0, 0
@@ -277,6 +275,7 @@ for item in historico:
 
 receita_pendente = receita_prevista - receita_recebida
 
+# CONTAINER DE MÉTRICAS
 with st.container():
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("👥 Seus Clientes", total_clientes)
@@ -300,6 +299,31 @@ with col2:
 
 st.divider()
 
+# ======================================
+# TABELA DE SITUAÇÃO DOS CLIENTES (COLORIDA)
+# ======================================
+st.subheader("👥 Situação Geral dos Clientes")
+if clientes:
+    df_cli = pd.DataFrame(clientes)
+    df_cli.columns = ["Nome", "WhatsApp", "Vencimento", "Status", "Valor (R$)", "Telas"]
+    
+    # Função que define a cor de fundo baseado no status de pagamento
+    def estilizar_linhas_clientes(row):
+        status = str(row["Status"]).strip().lower()
+        if status in ["recebido", "em dia"]:
+            # Verde escuro/médio confortável para leitura com texto branco
+            return ["background-color: #14532d !important; color: #ffffff !important; font-weight: bold;"] * len(row)
+        else:
+            # Amarelo/Âmbar escuro confortável para leitura com texto branco
+            return ["background-color: #713f12 !important; color: #ffffff !important; font-weight: bold;"] * len(row)
+
+    st.dataframe(df_cli.style.apply(estilizar_linhas_clientes, axis=1), use_container_width=True, hide_index=True)
+else:
+    st.info("Nenhum cliente cadastrado ainda.")
+
+st.divider()
+
+# ABA DE GESTÃO
 st.subheader("⚙️ Gerenciamento do Sistema")
 abas_disponiveis = ["💵 Registrar Pagamento", "➕ Novo Cliente", "✏️ Editar / Excluir"]
 if ROLE_LOGADO == "ADM": abas_disponiveis.append("👤 Painel ADM (Contas)")
