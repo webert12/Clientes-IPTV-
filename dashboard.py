@@ -10,6 +10,17 @@ from sqlalchemy.pool import NullPool
 # Configuração da página
 st.set_page_config(page_title="Vision Play TV", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
 
+# --- CSS PARA VISUAL PROFISSIONAL ---
+st.markdown("""
+    <style>
+    .stApp { background-color: #0b0f19; color: #e2e8f0; }
+    [data-testid="stMetric"] { background-color: #1e293b; padding: 15px; border-radius: 10px; border: 1px solid #334155; }
+    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
+    .stTabs [data-baseweb="tab"] { background-color: #1e293b; color: #94a3b8; border-radius: 8px 8px 0 0; }
+    .stTabs [aria-selected="true"] { background-color: #3b82f6 !important; color: white !important; }
+    </style>
+""", unsafe_allow_html=True)
+
 # Configuração do Fuso Horário de Brasília
 CORRETO_FUSO = ZoneInfo("America/Sao_Paulo")
 agora_br = datetime.now(CORRETO_FUSO)
@@ -151,7 +162,6 @@ if not st.session_state["logado"]:
 # ÁREA DO DASHBOARD (TOTALMENTE ISOLADA)
 # ==============================================================================
 
-# Captura estrita da sessão (Evita vazamento de estado global)
 USUARIO_LOGADO = st.session_state["usuario_nome"]
 ROLE_LOGADO = st.session_state["usuario_role"]
 
@@ -160,9 +170,6 @@ st.sidebar.markdown(f"👤 **Usuário:** `{USUARIO_LOGADO}`")
 st.sidebar.markdown(f"🎖️ **Nível:** `{ROLE_LOGADO}`")
 st.sidebar.divider()
 
-# ======================================
-# CARREGAMENTO ISOLADO BLINDADO
-# ======================================
 def carregar_dados_privados(dono_da_conta):
     with engine.connect() as conn:
         res_clientes = conn.execute(text("""
@@ -183,10 +190,8 @@ def carregar_dados_privados(dono_da_conta):
         lst_historico = [{"cliente": r[0], "valor": float(r[1] or 0), "data": r[2]} for r in res_historico]
         return lst_clientes, lst_historico
 
-# Carrega os dados EXCLUSIVOS do usuário logado
 clientes, historico = carregar_dados_privados(USUARIO_LOGADO)
 
-# --- CAIXA POP-UP DE LIMPEZA ---
 @st.dialog("🧹 Zerar Período")
 def abrir_popup_limpeza():
     st.write("Digite o **Dia/Mês** dos seus recebimentos que deseja limpar.")
@@ -202,7 +207,6 @@ def abrir_popup_limpeza():
                 """), {"padrao": f"%{data_limpar.strip()}%", "owner": USUARIO_LOGADO})
             st.rerun()
 
-# --- BOTÕES LATERAIS ---
 if ROLE_LOGADO == "ADM":
     if st.sidebar.button("🔄 Sincronizar Banco", use_container_width=True, key=f"sync_{USUARIO_LOGADO}"):
         st.rerun()
@@ -215,7 +219,7 @@ if st.sidebar.button("🚪 Sair", use_container_width=True, key=f"exit_{USUARIO_
     st.rerun()
 
 # ======================================
-# CÁLCULOS DO PAINEL (SÓ SEUS DADOS)
+# CÁLCULOS DO PAINEL
 # ======================================
 total_clientes = len(clientes)
 em_dia, vencendo, vencidos = 0, 0, 0
@@ -236,11 +240,13 @@ for item in historico:
 
 receita_pendente = receita_prevista - receita_recebida
 
-c1, c2, c3, c4 = st.columns(4)
-c1.metric("👥 Seus Clientes", total_clientes)
-c2.metric("💰 Sua Previsão", f"R$ {receita_prevista:.2f}")
-c3.metric("✅ Seu Recebido", f"R$ {receita_recebida:.2f}")
-c4.metric("⚠️ Seu Pendente", f"R$ {receita_pendente:.2f}")
+# CONTAINER DE MÉTRICAS
+with st.container():
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("👥 Seus Clientes", total_clientes)
+    c2.metric("💰 Sua Previsão", f"R$ {receita_prevista:.2f}")
+    c3.metric("✅ Seu Recebido", f"R$ {receita_recebida:.2f}")
+    c4.metric("⚠️ Seu Pendente", f"R$ {receita_pendente:.2f}")
 
 st.divider()
 
@@ -258,40 +264,29 @@ with col2:
 
 st.divider()
 
-# ======================================
-# ABA DE GESTÃO EM TEMPO REAL
-# ======================================
+# ABA DE GESTÃO
 st.subheader("⚙️ Gerenciamento do Sistema")
-
-# Lógica Dinâmica de Abas
 abas_disponiveis = ["💵 Registrar Pagamento", "➕ Novo Cliente", "✏️ Editar / Excluir"]
-if ROLE_LOGADO == "ADM":
-    abas_disponiveis.append("👤 Painel ADM (Contas)")
-
+if ROLE_LOGADO == "ADM": abas_disponiveis.append("👤 Painel ADM (Contas)")
 abas = st.tabs(abas_disponiveis)
 
-# ABA 1: REGISTRAR PAGAMENTO
 with abas[0]:
     if clientes:
         sel = st.selectbox("Escolha o Cliente:", [c["nome"] for c in clientes], key=f"sel_pag_{USUARIO_LOGADO}")
         cli = next(c for c in clientes if c["nome"] == sel)
-        
         st.markdown(f"💰 **Mensalidade:** `R$ {float(cli.get('valor', 25.0)):.2f}`")
         if st.button("⚡ Confirmar Pagamento", key=f"btn_pag_{USUARIO_LOGADO}"):
             novo_mes = hoje.month + 1 if hoje.day > 10 else hoje.month
             novo_ano = hoje.year + (1 if novo_mes > 12 else 0)
             novo_mes = 1 if novo_mes > 12 else novo_mes
             novo_vencimento = datetime(novo_ano, novo_mes, 10).strftime("%d/%m/%Y")
-            
             with engine.begin() as conn:
                 conn.execute(text("UPDATE vision_clientes SET status = 'Recebido', vencimento = :vencimento WHERE nome = :nome AND TRIM(LOWER(usuario_owner)) = :owner"), {"vencimento": novo_vencimento, "nome": cli["nome"], "owner": USUARIO_LOGADO})
                 conn.execute(text("INSERT INTO vision_historico (cliente, valor, data, usuario_owner) VALUES (:cliente, :valor, :data, :owner)"), {"cliente": cli["nome"], "valor": cli["valor"], "data": agora_br.strftime("%d/%m/%Y %H:%M"), "owner": USUARIO_LOGADO})
             st.success("Sucesso!")
             st.rerun()
-    else:
-        st.info("Sem clientes.")
+    else: st.info("Sem clientes.")
 
-# ABA 2: NOVO CLIENTE
 with abas[1]:
     with st.form(f"form_cad_{USUARIO_LOGADO}", clear_on_submit=False):
         n_nome = st.text_input("Nome do Cliente:")
@@ -300,21 +295,15 @@ with abas[1]:
         n_status = st.selectbox("Status:", ["Em Dia", "Vencendo", "Vencidos"])
         n_telas = st.number_input("Telas:", min_value=1, value=1)
         n_valor = st.number_input("Valor (R$):", min_value=0.0, value=25.0)
-        
         if st.form_submit_button("➕ Salvar Cliente"):
             if n_nome.strip():
                 try:
                     with engine.begin() as conn:
-                        conn.execute(text("""
-                            INSERT INTO vision_clientes (nome, whatsapp, vencimento, status, valor, telas, usuario_owner)
-                            VALUES (:n, :w, :v, :s, :val, :t, :owner)
-                        """), {"n": n_nome.strip(), "w": n_whats.strip(), "v": n_venc.strip(), "s": n_status, "val": n_valor, "t": int(n_telas), "owner": USUARIO_LOGADO})
+                        conn.execute(text("INSERT INTO vision_clientes (nome, whatsapp, vencimento, status, valor, telas, usuario_owner) VALUES (:n, :w, :v, :s, :val, :t, :owner)"), {"n": n_nome.strip(), "w": n_whats.strip(), "v": n_venc.strip(), "s": n_status, "val": n_valor, "t": int(n_telas), "owner": USUARIO_LOGADO})
                     st.success("Salvo!")
                     st.rerun()
-                except:
-                    st.error("Erro: Um cliente com esse nome já existe.")
+                except: st.error("Erro: Um cliente com esse nome já existe.")
 
-# ABA 3: EDITAR CLIENTE
 with abas[2]:
     if clientes:
         sel_ed = st.selectbox("Selecione para editar:", [c["nome"] for c in clientes], key=f"sel_ed_{USUARIO_LOGADO}")
@@ -325,7 +314,6 @@ with abas[2]:
             e_s = st.selectbox("Status:", ["Em Dia", "Vencendo", "Vencidos"], index=["Em Dia", "Vencendo", "Vencidos"].index(cli_ed["status"]) if cli_ed["status"] in ["Em Dia", "Vencendo", "Vencidos"] else 0)
             e_t = st.number_input("Telas:", min_value=1, value=int(cli_ed.get("telas", 1)))
             e_val = st.number_input("Valor:", min_value=0.0, value=float(cli_ed["valor"]))
-            
             c_ed1, c_ed2 = st.columns(2)
             if c_ed1.form_submit_button("💾 Atualizar"):
                 with engine.begin() as conn:
@@ -336,7 +324,6 @@ with abas[2]:
                     conn.execute(text("DELETE FROM vision_clientes WHERE nome=:n AND TRIM(LOWER(usuario_owner))=:owner"), {"n": cli_ed["nome"], "owner": USUARIO_LOGADO})
                 st.rerun()
 
-# ABA 4: ADM (Condicional)
 if ROLE_LOGADO == "ADM":
     with abas[3]:
         st.subheader("Gerenciar Revendedores/Usuários")
@@ -345,7 +332,6 @@ if ROLE_LOGADO == "ADM":
             u_pass = st.text_input("Senha:").strip()
             u_role = st.selectbox("Nível:", ["USER", "ADM"])
             u_dias = st.number_input("Dias de Vencimento (Conta):", min_value=1, value=30)
-            
             if st.form_submit_button("Criar Conta"):
                 venc = (hoje + timedelta(days=u_dias)).strftime("%d/%m/%Y")
                 try:
@@ -354,17 +340,12 @@ if ROLE_LOGADO == "ADM":
                     st.success("Conta criada!")
                     st.rerun()
                 except: st.error("Login já existe.")
-
         st.divider()
         with engine.connect() as conn:
             df_users = pd.DataFrame(conn.execute(text("SELECT id, username, password, role, status, vencimento_usuario FROM vision_usuarios")).mappings().fetchall())
-        if not df_users.empty:
-            st.dataframe(df_users, hide_index=True)
+        if not df_users.empty: st.dataframe(df_users, hide_index=True)
 
-# ÚLTIMOS RECEBIMENTOS
 st.divider()
 st.subheader("💵 Seus Últimos Recebimentos")
-if historico:
-    st.dataframe(pd.DataFrame(list(reversed(historico))[:10]), use_container_width=True, hide_index=True)
-else:
-    st.info("Nenhum registro seu.")
+if historico: st.dataframe(pd.DataFrame(list(reversed(historico))[:10]), use_container_width=True, hide_index=True)
+else: st.info("Nenhum registro seu.")
