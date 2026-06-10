@@ -7,17 +7,36 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
 
-# Configuração da página
-st.set_page_config(page_title="Vision Play TV", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
+# Configuração da página - Expandida para mostrar o menu
+st.set_page_config(page_title="Vision Play TV", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
 
-# --- CSS PARA VISUAL PROFISSIONAL ---
+# --- CSS PARA VISUAL PROFISSIONAL E CONTRASTE ---
 st.markdown("""
     <style>
-    .stApp { background-color: #0b0f19; color: #e2e8f0; }
-    [data-testid="stMetric"] { background-color: #1e293b; padding: 15px; border-radius: 10px; border: 1px solid #334155; }
+    /* Fundo Global */
+    .stApp { background-color: #0b0f19 !important; }
+    
+    /* Garantir que TODOS os textos sejam brancos ou claros para leitura */
+    h1, h2, h3, h4, p, div, label, span, .stMetric, .stMarkdown, .stTab { color: #ffffff !important; }
+    
+    /* Cartões de Métricas */
+    [data-testid="stMetric"] { 
+        background-color: #1e293b !important; 
+        padding: 20px !important; 
+        border-radius: 12px !important; 
+        border: 1px solid #475569 !important; 
+    }
+    
+    /* Sidebar */
+    [data-testid="stSidebar"] { background-color: #020617 !important; border-right: 1px solid #1e293b; }
+    
+    /* Abas */
     .stTabs [data-baseweb="tab-list"] { gap: 10px; }
-    .stTabs [data-baseweb="tab"] { background-color: #1e293b; color: #94a3b8; border-radius: 8px 8px 0 0; }
-    .stTabs [aria-selected="true"] { background-color: #3b82f6 !important; color: white !important; }
+    .stTabs [data-baseweb="tab"] { background-color: #1e293b; color: #ffffff !important; border-radius: 8px 8px 0 0; }
+    .stTabs [aria-selected="true"] { background-color: #3b82f6 !important; color: #ffffff !important; }
+    
+    /* Inputs */
+    .stTextInput input, .stSelectbox div { background-color: #1e293b !important; color: white !important; border: 1px solid #475569 !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -115,7 +134,7 @@ if not st.session_state["logado"]:
     """, unsafe_allow_html=True)
     
     with st.form("form_login", clear_on_submit=True):
-        st.markdown("<h2 style='text-align: center; color: #1E3A8A; margin-bottom: 0px;'>🔒 Vision Play TV</h2>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: center;'>🔒 Vision Play TV</h2>", unsafe_allow_html=True)
         st.markdown("<p style='text-align: center; color: #6B7280; font-size: 14px;'>Insira suas credenciais</p>", unsafe_allow_html=True)
         st.write("")
         
@@ -166,6 +185,9 @@ USUARIO_LOGADO = st.session_state["usuario_nome"]
 ROLE_LOGADO = st.session_state["usuario_role"]
 
 st.title("📊 Dashboard Vision Play TV")
+
+# Sidebar com título e informações
+st.sidebar.markdown("### 📋 Menu Principal")
 st.sidebar.markdown(f"👤 **Usuário:** `{USUARIO_LOGADO}`")
 st.sidebar.markdown(f"🎖️ **Nível:** `{ROLE_LOGADO}`")
 st.sidebar.divider()
