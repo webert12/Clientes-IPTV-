@@ -164,10 +164,6 @@ st.sidebar.divider()
 # CARREGAMENTO ISOLADO BLINDADO
 # ======================================
 def carregar_dados_privados(dono_da_conta):
-    """
-    Função blindada. Só retorna dados onde o dono_da_conta for EXATAMENTE
-    igual ao usuario_owner do banco de dados. Clientes do ADM não passam aqui.
-    """
     with engine.connect() as conn:
         res_clientes = conn.execute(text("""
             SELECT nome, whatsapp, vencimento, status, valor, telas 
@@ -266,6 +262,8 @@ st.divider()
 # ABA DE GESTÃO EM TEMPO REAL
 # ======================================
 st.subheader("⚙️ Gerenciamento do Sistema")
+
+# Lógica Dinâmica de Abas
 abas_disponiveis = ["💵 Registrar Pagamento", "➕ Novo Cliente", "✏️ Editar / Excluir"]
 if ROLE_LOGADO == "ADM":
     abas_disponiveis.append("👤 Painel ADM (Contas)")
@@ -338,7 +336,7 @@ with abas[2]:
                     conn.execute(text("DELETE FROM vision_clientes WHERE nome=:n AND TRIM(LOWER(usuario_owner))=:owner"), {"n": cli_ed["nome"], "owner": USUARIO_LOGADO})
                 st.rerun()
 
-# ABA 4: ADM
+# ABA 4: ADM (Condicional)
 if ROLE_LOGADO == "ADM":
     with abas[3]:
         st.subheader("Gerenciar Revendedores/Usuários")
