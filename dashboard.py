@@ -10,33 +10,47 @@ from sqlalchemy.pool import NullPool
 # Configuração da página - Expandida para mostrar o menu
 st.set_page_config(page_title="Vision Play TV", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
 
-# --- CSS PARA VISUAL PROFISSIONAL E CONTRASTE ---
+# --- CSS PARA VISIBILIDADE 100% (ALTO CONTRASTE) ---
 st.markdown("""
     <style>
-    /* Fundo Global */
+    /* Fundo Geral */
     .stApp { background-color: #0b0f19 !important; }
     
-    /* Garantir que TODOS os textos sejam brancos ou claros para leitura */
-    h1, h2, h3, h4, p, div, label, span, .stMetric, .stMarkdown, .stTab { color: #ffffff !important; }
+    /* Forçar todo o texto a ser branco ou visível */
+    h1, h2, h3, h4, p, div, label, span, .stMetric, .stMarkdown, .stTab, .stSelectbox, .stTextInput { 
+        color: #ffffff !important; 
+    }
     
-    /* Cartões de Métricas */
-    [data-testid="stMetric"] { 
+    /* Botões - Forçar estilo visível */
+    button { 
+        background-color: #3b82f6 !important; 
+        color: #ffffff !important; 
+        font-weight: bold !important;
+        border: 1px solid #60a5fa !important;
+    }
+    
+    /* Inputs e Caixas de Texto */
+    .stTextInput input, .stSelectbox div { 
         background-color: #1e293b !important; 
-        padding: 20px !important; 
-        border-radius: 12px !important; 
+        color: #ffffff !important; 
         border: 1px solid #475569 !important; 
     }
     
+    /* Métricas */
+    [data-testid="stMetric"] { 
+        background-color: #1e293b !important; 
+        padding: 15px !important; 
+        border-radius: 10px !important; 
+        border: 1px solid #334155 !important; 
+    }
+    
     /* Sidebar */
-    [data-testid="stSidebar"] { background-color: #020617 !important; border-right: 1px solid #1e293b; }
+    [data-testid="stSidebar"] { background-color: #020617 !important; }
     
     /* Abas */
     .stTabs [data-baseweb="tab-list"] { gap: 10px; }
-    .stTabs [data-baseweb="tab"] { background-color: #1e293b; color: #ffffff !important; border-radius: 8px 8px 0 0; }
+    .stTabs [data-baseweb="tab"] { background-color: #1e293b !important; color: #ffffff !important; }
     .stTabs [aria-selected="true"] { background-color: #3b82f6 !important; color: #ffffff !important; }
-    
-    /* Inputs */
-    .stTextInput input, .stSelectbox div { background-color: #1e293b !important; color: white !important; border: 1px solid #475569 !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -135,8 +149,7 @@ if not st.session_state["logado"]:
     
     with st.form("form_login", clear_on_submit=True):
         st.markdown("<h2 style='text-align: center;'>🔒 Vision Play TV</h2>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align: center; color: #6B7280; font-size: 14px;'>Insira suas credenciais</p>", unsafe_allow_html=True)
-        st.write("")
+        st.markdown("<p style='text-align: center; color: #ffffff !important; font-size: 14px;'>Insira suas credenciais</p>", unsafe_allow_html=True)
         
         user_input = st.text_input("Usuário:").strip().lower()
         pass_input = st.text_input("Senha:", type="password").strip()
@@ -297,7 +310,6 @@ with abas[0]:
         sel = st.selectbox("Escolha o Cliente:", [c["nome"] for c in clientes], key=f"sel_pag_{USUARIO_LOGADO}")
         cli = next(c for c in clientes if c["nome"] == sel)
         st.markdown(f"💰 **Mensalidade:** `R$ {float(cli.get('valor', 25.0)):.2f}`")
-        # LINHA CORRIGIDA ABAIXO
         if st.button("⚡ Confirmar Pagamento", key=f"btn_pag_{USUARIO_LOGADO}"):
             novo_mes = hoje.month + 1 if hoje.day > 10 else hoje.month
             novo_ano = hoje.year + (1 if novo_mes > 12 else 0)
