@@ -300,27 +300,6 @@ with col2:
 
 st.divider()
 
-# --- TABELA DE LISTAGEM DE CLIENTES COM CORES DINÂMICAS ---
-st.subheader("📋 Lista de Clientes e Situação")
-if clientes:
-    df_cli = pd.DataFrame(clientes)
-    df_cli.columns = ["Nome", "WhatsApp", "Vencimento", "Status", "Valor (R$)", "Telas"]
-    
-    def aplicar_cor_linha(row):
-        status = str(row["Status"]).strip().lower()
-        if status in ["recebido", "em dia"]:
-            # Verde escuro legível com texto branco
-            return ["background-color: #14532d !important; color: #ffffff !important; font-weight: bold;"] * len(row)
-        else:
-            # Amarelo/âmbar escuro legível com texto branco
-            return ["background-color: #713f12 !important; color: #ffffff !important; font-weight: bold;"] * len(row)
-
-    st.dataframe(df_cli.style.apply(aplicar_cor_linha, axis=1), use_container_width=True, hide_index=True)
-else:
-    st.info("Nenhum cliente cadastrado.")
-
-st.divider()
-
 # ABA DE GESTÃO
 st.subheader("⚙️ Gerenciamento do Sistema")
 abas_disponiveis = ["💵 Registrar Pagamento", "➕ Novo Cliente", "✏️ Editar / Excluir"]
