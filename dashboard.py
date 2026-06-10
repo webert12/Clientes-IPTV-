@@ -7,12 +7,15 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
 
-# Configuração da página - Expandida para mostrar o menu
-st.set_page_config(page_title="Vision Play TV", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
+# Configuração da página - Iniciada como collapsed para o seu botão gerenciar
+st.set_page_config(page_title="Vision Play TV", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
 
-# --- CSS PARA VISIBILIDADE 100% (ALTO CONTRASTE) ---
+# --- CSS PARA VISIBILIDADE 100% E OCULTAR BOTÃO PADRÃO ---
 st.markdown("""
     <style>
+    /* Ocultar o botão de menu padrão do Streamlit */
+    [data-testid="stSidebarCollapseButton"] { display: none !important; }
+    
     /* Fundo Geral */
     .stApp { background-color: #0b0f19 !important; }
     
@@ -43,9 +46,6 @@ st.markdown("""
         border-radius: 10px !important; 
         border: 1px solid #334155 !important; 
     }
-    
-    /* Sidebar */
-    [data-testid="stSidebar"] { background-color: #020617 !important; }
     
     /* Abas */
     .stTabs [data-baseweb="tab-list"] { gap: 10px; }
@@ -135,9 +135,6 @@ if "logado" not in st.session_state:
 if not st.session_state["logado"]:
     st.markdown("""
         <style>
-            [data-testid="stSidebar"] { display: none !important; width: 0px !important; }
-            [data-testid="stSidebarCollapseButton"] { display: none !important; }
-            .collapsedControl { display: none !important; }
             .stAppHeader { display: none !important; }
             [data-testid="stMainBlockContainer"] {
                 max-width: 520px !important;
@@ -197,13 +194,26 @@ if not st.session_state["logado"]:
 USUARIO_LOGADO = st.session_state["usuario_nome"]
 ROLE_LOGADO = st.session_state["usuario_role"]
 
-st.title("📊 Dashboard Vision Play TV")
+# MENU CUSTOMIZADO
+with st.popover("Menu"):
+    st.markdown("### 📋 Menu Principal")
+    st.markdown(f"👤 **Usuário:** `{USUARIO_LOGADO}`")
+    st.markdown(f"🎖️ **Nível:** `{ROLE_LOGADO}`")
+    st.divider()
+    
+    # Lógica do antigo sidebar dentro do popover
+    if ROLE_LOGADO == "ADM":
+        if st.button("🔄 Sincronizar Banco", use_container_width=True, key=f"sync_{USUARIO_LOGADO}"):
+            st.rerun()
 
-# Sidebar com título e informações
-st.sidebar.markdown("### 📋 Menu Principal")
-st.sidebar.markdown(f"👤 **Usuário:** `{USUARIO_LOGADO}`")
-st.sidebar.markdown(f"🎖️ **Nível:** `{ROLE_LOGADO}`")
-st.sidebar.divider()
+    if st.button("🧹 Limpar Histórico", use_container_width=True, key=f"clean_{USUARIO_LOGADO}"):
+        st.session_state["abrir_limpeza"] = True
+    
+    if st.button("🚪 Sair", use_container_width=True, key=f"exit_{USUARIO_LOGADO}"):
+        st.session_state.clear()
+        st.rerun()
+
+st.title("📊 Dashboard Vision Play TV")
 
 def carregar_dados_privados(dono_da_conta):
     with engine.connect() as conn:
@@ -227,31 +237,22 @@ def carregar_dados_privados(dono_da_conta):
 
 clientes, historico = carregar_dados_privados(USUARIO_LOGADO)
 
-@st.dialog("🧹 Zerar Período")
-def abrir_popup_limpeza():
-    st.write("Digite o **Dia/Mês** dos seus recebimentos que deseja limpar.")
-    data_limpar = st.text_input("Data (Ex: 10/06 ou /06):", value=hoje.strftime("%d/%m"), key=f"inp_cl_{USUARIO_LOGADO}")
-    st.warning("⚠️ Isso apagará APENAS os seus registros desta data!")
+# Popup de Limpeza
+if st.session_state.get("abrir_limpeza"):
+    with st.dialog("🧹 Zerar Período"):
+        st.write("Digite o **Dia/Mês** dos seus recebimentos que deseja limpar.")
+        data_limpar = st.text_input("Data (Ex: 10/06 ou /06):", value=hoje.strftime("%d/%m"), key=f"inp_cl_{USUARIO_LOGADO}")
+        st.warning("⚠️ Isso apagará APENAS os seus registros desta data!")
 
-    if st.button("🔥 Confirmar", use_container_width=True, key=f"btn_cl_{USUARIO_LOGADO}"):
-        if data_limpar.strip():
-            with engine.begin() as conn:
-                conn.execute(text("""
-                    DELETE FROM vision_historico 
-                    WHERE data LIKE :padrao AND TRIM(LOWER(usuario_owner)) = TRIM(LOWER(:owner))
-                """), {"padrao": f"%{data_limpar.strip()}%", "owner": USUARIO_LOGADO})
-            st.rerun()
-
-if ROLE_LOGADO == "ADM":
-    if st.sidebar.button("🔄 Sincronizar Banco", use_container_width=True, key=f"sync_{USUARIO_LOGADO}"):
-        st.rerun()
-
-if st.sidebar.button("🧹 Limpar Histórico", use_container_width=True, key=f"clean_{USUARIO_LOGADO}"):
-    abrir_popup_limpeza()
-
-if st.sidebar.button("🚪 Sair", use_container_width=True, key=f"exit_{USUARIO_LOGADO}"):
-    st.session_state.clear()
-    st.rerun()
+        if st.button("🔥 Confirmar", use_container_width=True, key=f"btn_cl_{USUARIO_LOGADO}"):
+            if data_limpar.strip():
+                with engine.begin() as conn:
+                    conn.execute(text("""
+                        DELETE FROM vision_historico 
+                        WHERE data LIKE :padrao AND TRIM(LOWER(usuario_owner)) = TRIM(LOWER(:owner))
+                    """), {"padrao": f"%{data_limpar.strip()}%", "owner": USUARIO_LOGADO})
+                st.session_state["abrir_limpeza"] = False
+                st.rerun()
 
 # ======================================
 # CÁLCULOS DO PAINEL
@@ -296,6 +297,24 @@ with col2:
         st.plotly_chart(px.pie(pd.DataFrame({"Tipo": ["Recebido", "Pendente"], "Valor": [receita_recebida, receita_pendente]}), names="Tipo", values="Valor", title="Seu Financeiro"), use_container_width=True)
     else:
         st.info("Financeiro zerado.")
+
+st.divider()
+
+# --- ATUALIZAÇÃO SOLICITADA: SITUAÇÃO DOS CLIENTES COLORIDA ---
+if clientes:
+    df_cli = pd.DataFrame(clientes)[["nome", "whatsapp", "vencimento", "status", "valor", "telas"]]
+    df_cli.columns = ["Nome", "WhatsApp", "Vencimento", "Status", "Valor (R$)", "Telas"]
+    
+    def aplicar_cores_linhas(row):
+        status = str(row["Status"]).strip().lower()
+        if status in ["recebido", "em dia"]:
+            # Linha verde para quem pagou / está em dia
+            return ["background-color: #14532d !important; color: #ffffff !important; font-weight: bold;"] * len(row)
+        else:
+            # Linha amarela para quem está pendente (vencendo/vencido)
+            return ["background-color: #713f12 !important; color: #ffffff !important; font-weight: bold;"] * len(row)
+
+    st.dataframe(df_cli.style.apply(aplicar_cores_linhas, axis=1), use_container_width=True, hide_index=True)
 
 st.divider()
 
