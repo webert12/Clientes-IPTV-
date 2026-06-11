@@ -59,18 +59,51 @@ st.markdown("""
     }
     
     /* CORREÇÃO BULLETPROOF DE VISIBILIDADE DOS INPUTS (TEXTO DIGITADO) */
-    input, textarea, [data-baseweb="select"], [data-baseweb="input"], [data-baseweb="base-input"] {
+    input, textarea, [data-baseweb="input"], [data-baseweb="base-input"] {
         background-color: #131a2c !important;
         color: #ffffff !important;
         -webkit-text-fill-color: #ffffff !important;
     }
     
-    .stTextInput input, .stSelectbox div[data-baseweb="select"], .stNumberInput input, .stTextArea textarea { 
+    .stTextInput input, .stNumberInput input, .stTextArea textarea { 
         background-color: #131a2c !important; 
         color: #ffffff !important; 
         -webkit-text-fill-color: #ffffff !important;
         border: 1px solid #3b82f6 !important; 
         border-radius: 8px !important;
+    }
+
+    /* FORÇAR VISIBILIDADE DO TEXTO SELECIONADO DENTRO DO SELECTBOX */
+    div[data-baseweb="select"], 
+    div[data-baseweb="select"] *, 
+    .stSelectbox div, 
+    .stSelectbox span {
+        background-color: #131a2c !important;
+        color: #ffffff !important;
+        -webkit-text-fill-color: #ffffff !important;
+    }
+    .stSelectbox div[data-baseweb="select"] {
+        border: 1px solid #3b82f6 !important;
+        border-radius: 8px !important;
+    }
+
+    /* CORREÇÃO ABSOLUTA DOS DROPDOWNS EXIBIDOS AO CLICAR (LISTA DE OPÇÕES/STATUS) */
+    div[data-baseweb="popover"],
+    div[data-baseweb="popover"] *,
+    div[data-testid="stPopoverBody"],
+    ul[data-baseweb="menu"],
+    ul[data-baseweb="menu"] *,
+    li[role="option"],
+    li[role="option"] * {
+        background-color: #0b0f19 !important;
+        color: #ffffff !important;
+        -webkit-text-fill-color: #ffffff !important;
+    }
+    
+    /* Efeito de Hover nas opções da lista */
+    li[role="option"]:hover, li[role="option"]:hover * {
+        background-color: #3b82f6 !important;
+        color: #ffffff !important;
     }
 
     /* Forçar cor branca mesmo se o navegador usar preenchimento automático (Autofill) */
@@ -91,27 +124,6 @@ st.markdown("""
         border: 2px solid #3b82f6 !important;
         border-radius: 12px !important;
         padding: 20px !important;
-    }
-    
-    /* CORREÇÃO DO POPOVER (MENU) */
-    div[data-baseweb="popover"],
-    div[data-baseweb="popover"] > div,
-    div[data-testid="stPopoverBody"] {
-        background-color: #0b0f19 !important;
-        background: #0b0f19 !important;
-        border: 2px solid #3b82f6 !important;
-        border-radius: 12px !important;
-        box-shadow: none !important;
-    }
-    
-    /* Dropdowns de Opções */
-    ul[data-baseweb="menu"], 
-    li[role="option"] {
-        background-color: #0b0f19 !important;
-        color: #ffffff !important;
-    }
-    li[role="option"]:hover {
-        background-color: #3b82f6 !important;
     }
 
     /* Métricas 100% Transparentes */
@@ -489,7 +501,7 @@ elif st.session_state["pagina_atual"] == "clientes":
                 falhas = 0
                 
                 with engine.begin() as conn:
-                    for linha in linhas:
+                    for linha in pandas:
                         if not linha.strip():
                             continue
                         if "," in linha:
@@ -582,7 +594,7 @@ elif st.session_state["pagina_atual"] == "clientes":
                         if c_ubtn1.form_submit_button("💾 Salvar Alterações"):
                             with engine.begin() as conn:
                                 conn.execute(text("UPDATE vision_usuarios SET password=:p, role=:r, status=:s, vencimento_usuario=:v WHERE username=:u"), {"p": e_u_pass, "r": e_u_role, "s": e_u_status, "v": e_u_venc, "u": sel_usr_nome})
-                            st.success("Usuário atualizado!")
+                            st.success("Usuário updated!")
                             st.rerun()
                             
                         if c_ubtn2.form_submit_button("🚨 Deletar Conta"):
