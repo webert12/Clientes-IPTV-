@@ -7,12 +7,27 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
 
-# Configuração da página - Expandida para mostrar o menu
-st.set_page_config(page_title="Vision Play TV", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
+# Configuração da página
+st.set_page_config(page_title="Vision Play TV", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
 
-# --- CSS PARA VISIBILIDADE 100% (ALTO CONTRASTE) ---
+# --- CSS PARA VISIBILIDADE 100% (ALTO CONTRASTE) E REMOÇÃO DE CABEÇALHO NATIVO ---
 st.markdown("""
     <style>
+    /* Ocultar completamente o cabeçalho padrão, menu nativo, deploy e ícones do GitHub */
+    .stAppHeader, [data-testid="stHeader"], [data-testid="stAppDeployButton"], #MainMenu { 
+        display: none !important; 
+    }
+    
+    /* Ocultar permanentemente a barra lateral nativa e as setas de controle */
+    [data-testid="stSidebar"], [data-testid="stSidebarCollapseButton"], .collapsedControl { 
+        display: none !important; 
+    }
+    
+    /* Ajuste de espaçamento superior devido à remoção do cabeçalho */
+    [data-testid="stMainBlockContainer"] {
+        padding-top: 2rem !important;
+    }
+
     /* Fundo Geral */
     .stApp { background-color: #0b0f19 !important; }
     
@@ -43,9 +58,6 @@ st.markdown("""
         border-radius: 10px !important; 
         border: 1px solid #334155 !important; 
     }
-    
-    /* Sidebar */
-    [data-testid="stSidebar"] { background-color: #020617 !important; }
     
     /* Abas */
     .stTabs [data-baseweb="tab-list"] { gap: 10px; }
@@ -135,10 +147,6 @@ if "logado" not in st.session_state:
 if not st.session_state["logado"]:
     st.markdown("""
         <style>
-            [data-testid="stSidebar"] { display: none !important; width: 0px !important; }
-            [data-testid="stSidebarCollapseButton"] { display: none !important; }
-            .collapsedControl { display: none !important; }
-            .stAppHeader { display: none !important; }
             [data-testid="stMainBlockContainer"] {
                 max-width: 520px !important;
                 margin: 0 auto !important;
@@ -197,13 +205,14 @@ if not st.session_state["logado"]:
 USUARIO_LOGADO = st.session_state["usuario_nome"]
 ROLE_LOGADO = st.session_state["usuario_role"]
 
-st.title("📊 Dashboard Vision Play TV")
+# NOVO BOTÃO DE MENU (Substituindo a antiga Barra Lateral / Setas >>)
+menu_opcoes = st.popover("📋 Menu", use_container_width=False)
+menu_opcoes.markdown("### 📋 Menu Principal")
+menu_opcoes.markdown(f"👤 **Usuário:** `{USUARIO_LOGADO}`")
+menu_opcoes.markdown(f"🎖️ **Nível:** `{ROLE_LOGADO}`")
+menu_opcoes.divider()
 
-# Sidebar com título e informações
-st.sidebar.markdown("### 📋 Menu Principal")
-st.sidebar.markdown(f"👤 **Usuário:** `{USUARIO_LOGADO}`")
-st.sidebar.markdown(f"🎖️ **Nível:** `{ROLE_LOGADO}`")
-st.sidebar.divider()
+st.title("📊 Dashboard Vision Play TV")
 
 def carregar_dados_privados(dono_da_conta):
     with engine.connect() as conn:
@@ -242,14 +251,15 @@ def abrir_popup_limpeza():
                 """), {"padrao": f"%{data_limpar.strip()}%", "owner": USUARIO_LOGADO})
             st.rerun()
 
+# Ações integradas diretamente dentro do novo Menu Dinâmico
 if ROLE_LOGADO == "ADM":
-    if st.sidebar.button("🔄 Sincronizar Banco", use_container_width=True, key=f"sync_{USUARIO_LOGADO}"):
+    if menu_opcoes.button("🔄 Sincronizar Banco", use_container_width=True, key=f"sync_{USUARIO_LOGADO}"):
         st.rerun()
 
-if st.sidebar.button("🧹 Limpar Histórico", use_container_width=True, key=f"clean_{USUARIO_LOGADO}"):
+if menu_opcoes.button("🧹 Limpar Histórico", use_container_width=True, key=f"clean_{USUARIO_LOGADO}"):
     abrir_popup_limpeza()
 
-if st.sidebar.button("🚪 Sair", use_container_width=True, key=f"exit_{USUARIO_LOGADO}"):
+if menu_opcoes.button("🚪 Sair", use_container_width=True, key=f"exit_{USUARIO_LOGADO}"):
     st.session_state.clear()
     st.rerun()
 
