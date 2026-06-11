@@ -370,7 +370,7 @@ st.divider()
 # ABAS DE GESTÃO E CONTEÚDOS COMPLETOS
 # ======================================
 st.subheader("⚙️ Gerenciamento do Sistema")
-abas_disponiveis = ["💵 Registrar Pagamento", "➕ Novo Cliente", "✏️ Editar / Excluir"]
+abas_disponiveis = ["💵 Registrar Pagamento", "➕ Novo Cliente", "📥 Importar Massa", "✏️ Editar / Excluir"]
 if ROLE_LOGADO == "ADM": abas_disponiveis.append("👤 Painel ADM (Contas)")
 abas = st.tabs(abas_disponiveis)
 
@@ -403,7 +403,20 @@ with abas[1]:
                 st.success("Cliente salvo!")
                 st.rerun()
 
-with abas[2]:
+with abas[2]: # ABA IMPORTAÇÃO EM MASSA
+    st.write("📥 **Adicionar Clientes em Massa**")
+    massa_nomes = st.text_area("Cole os nomes dos clientes (um por linha):", height=150)
+    if st.button("🚀 Salvar Lista de Clientes", use_container_width=True):
+        if massa_nomes.strip():
+            lista_nomes = [n.strip() for n in massa_nomes.split('\n') if n.strip()]
+            with engine.begin() as conn:
+                for n in lista_nomes:
+                    conn.execute(text("INSERT INTO vision_clientes (nome, whatsapp, vencimento, status, valor, telas, usuario_owner) VALUES (:n, 'Não informado', :v, 'Em Dia', 25.00, 1, :o)"), 
+                                 {"n": n, "v": hoje.strftime("%d/%m/%Y"), "o": USUARIO_LOGADO})
+            st.success(f"{len(lista_nomes)} clientes adicionados com sucesso!")
+            st.rerun()
+
+with abas[3]:
     if clientes:
         sel_ed = st.selectbox("Selecione quem deseja alterar:", [c["nome"] for c in clientes], key="sb_e")
         cli_ed = next(c for c in clientes if c["nome"] == sel_ed)
@@ -424,7 +437,7 @@ with abas[2]:
                 st.rerun()
 
 if ROLE_LOGADO == "ADM":
-    with abas[3]:
+    with abas[4]: # Índice ajustado para 4 porque temos 4 abas anteriores
         st.subheader("Gerenciar Revendedores / Usuários")
         with st.form("f_new_usr", clear_on_submit=True):
             u_nome = st.text_input("Login:").strip().lower()
