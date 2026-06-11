@@ -7,74 +7,88 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
 
-# Configuração da página - Iniciada como collapsed para o seu botão gerenciar
+# Configuração da página - Forçando o fechamento de qualquer barra lateral nativa
 st.set_page_config(page_title="Vision Play TV", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
 
-# --- CSS EXTRA FORTE PARA VISIBILIDADE 100% E REMOÇÃO DE MENUS NATIVOS ---
+# --- CSS DEFINITIVO E BLINDADO PARA VISIBILIDADE 100% ---
 st.markdown("""
     <style>
-    /* 1. OCULTAR COMPLETAMENTE O BOTÃO LATERAL (>>), CÁBEÇALHO E BARRA SUPERIOR */
-    [data-testid="stHeader"], 
+    /* 1. ELIMINAR COMPLETAMENTE MENUS, SETAS (>>), BARRAS LATERAIS E CABEÇALHOS NATIVOS */
+    [data-testid="stSidebar"], 
     [data-testid="stSidebarCollapseButton"], 
+    [data-testid="stHeader"], 
     .stAppHeader, 
     header, 
-    button[aria-label="Expand sidebar"],
-    button[data-testid="stSidebarCollapseButton"] {
+    button[aria-label="Expand sidebar"] {
         display: none !important;
+        visibility: hidden !important;
     }
     
-    /* 2. FUNDO GERAL DO APLICATIVO */
+    /* 2. FUNDO DO APLICATIVO */
     .stApp { background-color: #0b0f19 !important; }
     
-    /* 3. CONTRASTE MÁXIMO PARA TEXTOS, TÍTULOS E LABELS */
-    h1, h2, h3, h4, h5, h6 { color: #ffffff !important; font-weight: bold !important; }
-    p, span, label, .stMarkdown, [data-testid="stWidgetLabel"] p { color: #f1f5f9 !important; font-size: 15px !important; }
+    /* 3. TÍTULOS E TEXTOS COM CONTRASTE MÁXIMO BRANCO */
+    h1, h2, h3, h4, h5, h6 { color: #ffffff !important; font-weight: 800 !important; }
+    p, span, label, .stMarkdown, [data-testid="stWidgetLabel"] p { color: #f1f5f9 !important; font-size: 16px !important; font-weight: 600 !important; }
     
-    /* 4. BOTÕES TOTALMENTE VISÍVEIS (AZUL ELÉTRICO COM BORDA BRILHANTE) */
+    # .stWidgetLabel { color: #ffffff !important; }
+
+    /* 4. BOTÕES COM VISIBILIDADE TOTAL (AZUL ELÉTRICO, BORDA REFORÇADA E TEXTO BRANCO) */
     button, .stButton > button { 
         background-color: #2563eb !important; 
         color: #ffffff !important; 
         font-weight: bold !important;
-        border: 2px solid #60a5fa !important;
+        border: 2px solid #ffffff !important;
         border-radius: 6px !important;
         padding: 0.6rem 1.2rem !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.4) !important;
     }
     button:hover, .stButton > button:hover {
         background-color: #1d4ed8 !important;
-        border-color: #93c5fd !important;
+        border-color: #60a5fa !important;
+        color: #ffffff !important;
     }
     
-    /* 5. INPUTS E CAIXAS DE SELEÇÃO AJUSTADOS (SEM TEXTO INVISÍVEL) */
+    /* 5. CAIXAS DE ENTRADA DE TEXTO E SELEÇÃO CORRIGIDAS */
     input, select, textarea, div[data-baseweb="select"] {
         background-color: #1e293b !important;
         color: #ffffff !important;
-        border: 2px solid #475569 !important;
+        border: 2px solid #64748b !important;
         border-radius: 6px !important;
     }
-    .stTextInput input { color: #ffffff !important; background-color: #1e293b !important; }
-    div[data-baseweb="select"] * { color: #ffffff !important; }
+    .stTextInput input, .stNumberInput input { 
+        color: #ffffff !important; 
+        background-color: #1e293b !important; 
+        font-size: 16px !important;
+    }
     
-    /* 6. MÉTRICAS DESTACADAS */
+    /* Garantir leitura perfeita dos textos e opções dos Dropdowns */
+    div[data-baseweb="select"] * { color: #ffffff !important; }
+    div[data-baseweb="popover"] ul, div[role="listbox"] { background-color: #1e293b !important; }
+    div[role="listbox"] li, [data-baseweb="select"] li { color: #ffffff !important; background-color: #1e293b !important; }
+    
+    /* 6. BLOCOS DE MÉTRICAS */
     [data-testid="stMetric"] { 
         background-color: #1e293b !important; 
         padding: 18px !important; 
         border-radius: 10px !important; 
-        border: 2px solid #334155 !important; 
+        border: 2px solid #475569 !important; 
     }
-    [data-testid="stMetricValue"] > div { color: #38bdf8 !important; font-weight: 800 !important; }
-    [data-testid="stMetricLabel"] > div { color: #94a3b8 !important; font-weight: bold !important; }
+    [data-testid="stMetricValue"] > div { color: #38bdf8 !important; font-weight: 800 !important; font-size: 26px !important; }
+    [data-testid="stMetricLabel"] > div { color: #cbd5e1 !important; font-weight: bold !important; }
     
-    /* 7. ABAS DO GERENCIAMENTO */
-    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
+    /* 7. ABAS DE GERENCIAMENTO */
+    .stTabs [data-baseweb="tab-list"] { gap: 8px; }
     .stTabs [data-baseweb="tab"] { 
         background-color: #1e293b !important; 
         color: #ffffff !important; 
-        border: 1px solid #475569 !important;
+        border: 2px solid #475569 !important;
         border-radius: 6px 6px 0 0 !important;
+        padding: 10px 16px !important;
     }
     .stTabs [aria-selected="true"] { 
         background-color: #2563eb !important; 
-        color: #ffffff !important; 
+        border-color: #ffffff !important;
         font-weight: bold !important;
     }
     </style>
@@ -132,7 +146,6 @@ def inicializar_banco():
         conn.execute(text("ALTER TABLE vision_clientes ADD COLUMN IF NOT EXISTS telas INTEGER DEFAULT 1;"))
         conn.execute(text("ALTER TABLE vision_clientes ADD COLUMN IF NOT EXISTS usuario_owner VARCHAR(255) DEFAULT 'admin';"))
         
-        # Garante que clientes antigos que não tinham dono (NULL) virem do 'admin'
         conn.execute(text("UPDATE vision_clientes SET usuario_owner = 'admin' WHERE usuario_owner IS NULL OR TRIM(usuario_owner) = '';"))
         
         # Tabela de Histórico
@@ -150,28 +163,27 @@ def inicializar_banco():
 inicializar_banco()
 
 # ======================================
-# SISTEMA DE CONTROLE DE LOGIN E SESSÃO
+# SISTEMA DE LOGIN
 # ======================================
 if "logado" not in st.session_state:
     st.session_state["logado"] = False
     st.session_state["usuario_nome"] = ""
     st.session_state["usuario_role"] = ""
 
-# SE NÃO ESTIVER LOGADO, MOSTRA SÓ O LOGIN
 if not st.session_state["logado"]:
     st.markdown("""
         <style>
             [data-testid="stMainBlockContainer"] {
                 max-width: 520px !important;
                 margin: 0 auto !important;
-                padding-top: 8rem !important;
+                padding-top: 6rem !important;
             }
         </style>
     """, unsafe_allow_html=True)
     
     with st.form("form_login", clear_on_submit=True):
         st.markdown("<h2 style='text-align: center;'>🔒 Vision Play TV</h2>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align: center; color: #f1f5f9 !important; font-size: 14px;'>Insira suas credenciais</p>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; color: #cbd5e1 !important;'>Insira suas credenciais</p>", unsafe_allow_html=True)
         
         user_input = st.text_input("Usuário:").strip().lower()
         pass_input = st.text_input("Senha:", type="password").strip()
@@ -213,15 +225,14 @@ if not st.session_state["logado"]:
     st.stop()
 
 # ==============================================================================
-# ÁREA DO DASHBOARD
+# DASHBOARD PRINCIPAL
 # ==============================================================================
-
 USUARIO_LOGADO = st.session_state["usuario_nome"]
 ROLE_LOGADO = st.session_state["usuario_role"]
 
-# MENU CUSTOMIZADO
-with st.popover("Menu"):
-    st.markdown("### 📋 Menu Principal")
+# Menu Customizado no Popover
+with st.popover("Menu do Sistema"):
+    st.markdown("### 📋 Opções")
     st.markdown(f"👤 **Usuário:** `{USUARIO_LOGADO}`")
     st.markdown(f"🎖️ **Nível:** `{ROLE_LOGADO}`")
     st.divider()
@@ -322,20 +333,20 @@ with col2:
 
 st.divider()
 
-# --- TABELA DE CLIENTES EM HTML IMUNE A FALHAS DE TEMA (100% VISÍVEL) ---
+# --- TABELA DE CLIENTES EM HTML BLINDADO (100% VISÍVEL EM QUALQUER CELULAR) ---
 st.subheader("📋 Lista de Clientes e Situação")
 if clientes:
     html_table = """
-    <div style="overflow-x:auto; background-color: #111827; padding: 10px; border-radius: 8px;">
-        <table style="width:100%; border-collapse: collapse; color: #ffffff; font-family: sans-serif; text-align: left;">
+    <div style="overflow-x:auto; background-color: #111827; padding: 12px; border-radius: 8px; border: 2px solid #334155;">
+        <table style="width:100%; border-collapse: collapse; font-family: sans-serif; text-align: left;">
             <thead>
-                <tr style="background-color: #1e293b; border-bottom: 3px solid #475569;">
-                    <th style="padding: 14px; color: #ffffff; font-weight: bold;">Nome</th>
-                    <th style="padding: 14px; color: #ffffff; font-weight: bold;">WhatsApp</th>
-                    <th style="padding: 14px; color: #ffffff; font-weight: bold;">Vencimento</th>
-                    <th style="padding: 14px; color: #ffffff; font-weight: bold;">Status</th>
-                    <th style="padding: 14px; color: #ffffff; font-weight: bold;">Valor</th>
-                    <th style="padding: 14px; color: #ffffff; font-weight: bold;">Telas</th>
+                <tr style="background-color: #1e293b; border-bottom: 3px solid #64748b;">
+                    <th style="padding: 14px; color: #ffffff !important; font-weight: bold; font-size: 15px;">Nome</th>
+                    <th style="padding: 14px; color: #ffffff !important; font-weight: bold; font-size: 15px;">WhatsApp</th>
+                    <th style="padding: 14px; color: #ffffff !important; font-weight: bold; font-size: 15px;">Vencimento</th>
+                    <th style="padding: 14px; color: #ffffff !important; font-weight: bold; font-size: 15px;">Status</th>
+                    <th style="padding: 14px; color: #ffffff !important; font-weight: bold; font-size: 15px;">Valor</th>
+                    <th style="padding: 14px; color: #ffffff !important; font-weight: bold; font-size: 15px;">Telas</th>
                 </tr>
             </thead>
             <tbody>
@@ -343,20 +354,20 @@ if clientes:
     for c in clientes:
         status_lower = str(c["status"]).strip().lower()
         if status_lower in ["recebido", "em dia"]:
-            bg_color = "#065f46"  # Verde Esmeralda Escuro
+            bg_color = "#065f46"  # Verde Esmeralda Sólido
             border_color = "#10b981"
         else:
-            bg_color = "#9a3412"  # Laranja Queimado Escuro
+            bg_color = "#9a3412"  # Laranja Queimado Sólido
             border_color = "#f97316"
             
         html_table += f"""
-            <tr style="background-color: {bg_color}; border-bottom: 2px solid {border_color}; font-weight: bold;">
-                <td style="padding: 14px; color: #ffffff !important;">{c['nome']}</td>
-                <td style="padding: 14px; color: #ffffff !important;">{c['whatsapp']}</td>
-                <td style="padding: 14px; color: #ffffff !important;">{c['vencimento']}</td>
-                <td style="padding: 14px; color: #ffffff !important;">{c['status']}</td>
-                <td style="padding: 14px; color: #ffffff !important;">R$ {c['valor']:.2f}</td>
-                <td style="padding: 14px; color: #ffffff !important;">{c['telas']}</td>
+            <tr style="background-color: {bg_color}; border-bottom: 2px solid {border_color};">
+                <td style="padding: 14px; color: #ffffff !important; font-weight: bold; font-size: 15px;">{c['nome']}</td>
+                <td style="padding: 14px; color: #ffffff !important; font-weight: bold; font-size: 15px;">{c['whatsapp']}</td>
+                <td style="padding: 14px; color: #ffffff !important; font-weight: bold; font-size: 15px;">{c['vencimento']}</td>
+                <td style="padding: 14px; color: #ffffff !important; font-weight: bold; font-size: 15px;">{c['status']}</td>
+                <td style="padding: 14px; color: #ffffff !important; font-weight: bold; font-size: 15px;">R$ {c['valor']:.2f}</td>
+                <td style="padding: 14px; color: #ffffff !important; font-weight: bold; font-size: 15px;">{c['telas']}</td>
             </tr>
         """
     html_table += "</tbody></table></div>"
@@ -366,7 +377,7 @@ else:
 
 st.divider()
 
-# ABA DE GESTÃO
+# ABAS DE GESTÃO DO SISTEMA
 st.subheader("⚙️ Gerenciamento do Sistema")
 abas_disponiveis = ["💵 Registrar Pagamento", "➕ Novo Cliente", "✏️ Editar / Excluir"]
 if ROLE_LOGADO == "ADM": abas_disponiveis.append("👤 Painel ADM (Contas)")
@@ -374,10 +385,10 @@ abas = st.tabs(abas_disponiveis)
 
 with abas[0]:
     if clientes:
-        sel = st.selectbox("Escolha o Cliente:", [c["nome"] for c in clientes], key=f"sel_pag_{USUARIO_LOGADO}")
+        sel = st.selectbox("Escolha o Cliente para pagar:", [c["nome"] for c in clientes], key=f"sel_pag_{USUARIO_LOGADO}")
         cli = next(c for c in clientes if c["nome"] == sel)
-        st.markdown(f"💰 **Mensalidade:** `R$ {float(cli.get('valor', 25.0)):.2f}`")
-        if st.button("⚡ Confirmar Pagamento", key=f"btn_pag_{USUARIO_LOGADO}"):
+        st.markdown(f"💰 **Mensalidade cadastrada:** `R$ {float(cli.get('valor', 25.0)):.2f}`")
+        if st.button("⚡ Confirmar Pagamento", key=f"btn_pag_{USUARIO_LOGADO}", use_container_width=True):
             novo_mes = hoje.month + 1 if hoje.day > 10 else hoje.month
             novo_ano = hoje.year + (1 if novo_mes > 12 else 0)
             novo_mes = 1 if novo_mes > 12 else novo_mes
@@ -385,7 +396,7 @@ with abas[0]:
             with engine.begin() as conn:
                 conn.execute(text("UPDATE vision_clientes SET status = 'Recebido', vencimento = :vencimento WHERE nome = :nome AND TRIM(LOWER(usuario_owner)) = :owner"), {"vencimento": novo_vencimento, "nome": cli["nome"], "owner": USUARIO_LOGADO})
                 conn.execute(text("INSERT INTO vision_historico (cliente, valor, data, usuario_owner) VALUES (:cliente, :valor, :data, :owner)"), {"cliente": cli["nome"], "valor": cli["valor"], "data": agora_br.strftime("%d/%m/%Y %H:%M"), "owner": USUARIO_LOGADO})
-            st.success("Sucesso!")
+            st.success("Pagamento confirmado com sucesso!")
             st.rerun()
     else: st.info("Sem clientes.")
 
@@ -394,21 +405,21 @@ with abas[1]:
         n_nome = st.text_input("Nome do Cliente:")
         n_whats = st.text_input("WhatsApp:")
         n_venc = st.text_input("Vencimento:", value=hoje.strftime("10/%m/%Y"))
-        n_status = st.selectbox("Status:", ["Em Dia", "Vencendo", "Vencidos"])
-        n_telas = st.number_input("Telas:", min_value=1, value=1)
-        n_valor = st.number_input("Valor (R$):", min_value=0.0, value=25.0)
-        if st.form_submit_button("➕ Salvar Cliente"):
+        n_status = st.selectbox("Status Inicial:", ["Em Dia", "Vencendo", "Vencidos"])
+        n_telas = st.number_input("Quantidade de Telas:", min_value=1, value=1)
+        n_valor = st.number_input("Valor Mensalidade (R$):", min_value=0.0, value=25.0)
+        if st.form_submit_button("➕ Salvar Cliente", use_container_width=True):
             if n_nome.strip():
                 try:
                     with engine.begin() as conn:
                         conn.execute(text("INSERT INTO vision_clientes (nome, whatsapp, vencimento, status, valor, telas, usuario_owner) VALUES (:n, :w, :v, :s, :val, :t, :owner)"), {"n": n_nome.strip(), "w": n_whats.strip(), "v": n_venc.strip(), "s": n_status, "val": n_valor, "t": int(n_telas), "owner": USUARIO_LOGADO})
-                    st.success("Salvo!")
+                    st.success("Cliente cadastrado com sucesso!")
                     st.rerun()
                 except: st.error("Erro: Um cliente com esse nome já existe.")
 
 with abas[2]:
     if clientes:
-        sel_ed = st.selectbox("Selecione para editar:", [c["nome"] for c in clientes], key=f"sel_ed_{USUARIO_LOGADO}")
+        sel_ed = st.selectbox("Selecione quem deseja alterar:", [c["nome"] for c in clientes], key=f"sel_ed_{USUARIO_LOGADO}")
         cli_ed = next(c for c in clientes if c["nome"] == sel_ed)
         with st.form(f"form_ed_{USUARIO_LOGADO}"):
             e_w = st.text_input("WhatsApp:", value=cli_ed["whatsapp"])
@@ -417,11 +428,11 @@ with abas[2]:
             e_t = st.number_input("Telas:", min_value=1, value=int(cli_ed.get("telas", 1)))
             e_val = st.number_input("Valor:", min_value=0.0, value=float(cli_ed["valor"]))
             c_ed1, c_ed2 = st.columns(2)
-            if c_ed1.form_submit_button("💾 Atualizar"):
+            if c_ed1.form_submit_button("💾 Atualizar Dados", use_container_width=True):
                 with engine.begin() as conn:
                     conn.execute(text("UPDATE vision_clientes SET whatsapp=:w, vencimento=:v, status=:s, valor=:val, telas=:t WHERE nome=:n AND TRIM(LOWER(usuario_owner))=:owner"), {"w": e_w, "v": e_v, "s": e_s, "val": e_val, "t": int(e_t), "n": cli_ed["nome"], "owner": USUARIO_LOGADO})
                 st.rerun()
-            if c_ed2.form_submit_button("🚨 Excluir"):
+            if c_ed2.form_submit_button("🚨 Excluir Cliente", use_container_width=True):
                 with engine.begin() as conn:
                     conn.execute(text("DELETE FROM vision_clientes WHERE nome=:n AND TRIM(LOWER(usuario_owner))=:owner"), {"n": cli_ed["nome"], "owner": USUARIO_LOGADO})
                 st.rerun()
@@ -432,44 +443,44 @@ if ROLE_LOGADO == "ADM":
         with st.form(f"f_new_usr_{USUARIO_LOGADO}", clear_on_submit=True):
             u_nome = st.text_input("Login:").strip().lower()
             u_pass = st.text_input("Senha:").strip()
-            u_role = st.selectbox("Nível:", ["USER", "ADM"])
-            u_dias = st.number_input("Dias de Vencimento (Conta):", min_value=1, value=30)
-            if st.form_submit_button("Criar Conta"):
+            u_role = st.selectbox("Nível de Acesso:", ["USER", "ADM"])
+            u_dias = st.number_input("Dias de Vencimento da Conta:", min_value=1, value=30)
+            if st.form_submit_button("Criar Nova Conta", use_container_width=True):
                 venc = (hoje + timedelta(days=u_dias)).strftime("%d/%m/%Y")
                 try:
                     with engine.begin() as conn:
                         conn.execute(text("INSERT INTO vision_usuarios (username, password, role, status, tipo_conta, vencimento_usuario) VALUES (:u, :p, :r, 'Ativo', 'Final', :v)"), {"u": u_nome, "p": u_pass, "r": u_role, "v": venc})
-                    st.success("Conta criada!")
+                    st.success("Conta revendedor adicionada!")
                     st.rerun()
-                except: st.error("Login já existe.")
+                except: st.error("Este login já existe no sistema.")
         st.divider()
         with engine.connect() as conn:
             df_users = pd.DataFrame(conn.execute(text("SELECT id, username, password, role, status, vencimento_usuario FROM vision_usuarios")).mappings().fetchall())
         if not df_users.empty:
             html_users = """
-            <div style="overflow-x:auto; background-color: #111827; padding: 10px; border-radius: 8px;">
-                <table style="width:100%; border-collapse: collapse; color: #ffffff; font-family: sans-serif; text-align: left;">
+            <div style="overflow-x:auto; background-color: #111827; padding: 12px; border-radius: 8px; border: 2px solid #334155;">
+                <table style="width:100%; border-collapse: collapse; font-family: sans-serif; text-align: left;">
                     <thead>
                         <tr style="background-color: #1e293b; border-bottom: 2px solid #475569;">
-                            <th style="padding: 10px; color: #ffffff;">ID</th>
-                            <th style="padding: 10px; color: #ffffff;">Usuário</th>
-                            <th style="padding: 10px; color: #ffffff;">Senha</th>
-                            <th style="padding: 10px; color: #ffffff;">Nível</th>
-                            <th style="padding: 10px; color: #ffffff;">Status</th>
-                            <th style="padding: 10px; color: #ffffff;">Vencimento</th>
+                            <th style="padding: 10px; color: #ffffff !important; font-weight: bold;">ID</th>
+                            <th style="padding: 10px; color: #ffffff !important; font-weight: bold;">Usuário</th>
+                            <th style="padding: 10px; color: #ffffff !important; font-weight: bold;">Senha</th>
+                            <th style="padding: 10px; color: #ffffff !important; font-weight: bold;">Nível</th>
+                            <th style="padding: 10px; color: #ffffff !important; font-weight: bold;">Status</th>
+                            <th style="padding: 10px; color: #ffffff !important; font-weight: bold;">Vencimento</th>
                         </tr>
                     </thead>
                     <tbody>
             """
             for idx, row in df_users.iterrows():
                 html_users += f"""
-                    <tr style="border-bottom: 1px solid #334155;">
-                        <td style="padding: 10px; color: #ffffff !important;">{row['id']}</td>
-                        <td style="padding: 10px; color: #ffffff !important;">{row['username']}</td>
-                        <td style="padding: 10px; color: #ffffff !important;">{row['password']}</td>
-                        <td style="padding: 10px; color: #ffffff !important;">{row['role']}</td>
-                        <td style="padding: 10px; color: #ffffff !important;">{row['status']}</td>
-                        <td style="padding: 10px; color: #ffffff !important;">{row['vencimento_usuario']}</td>
+                    <tr style="border-bottom: 1px solid #334155; background-color: #1e293b;">
+                        <td style="padding: 10px; color: #ffffff !important; font-weight: 600;">{row['id']}</td>
+                        <td style="padding: 10px; color: #ffffff !important; font-weight: 600;">{row['username']}</td>
+                        <td style="padding: 10px; color: #ffffff !important; font-weight: 600;">{row['password']}</td>
+                        <td style="padding: 10px; color: #ffffff !important; font-weight: 600;">{row['role']}</td>
+                        <td style="padding: 10px; color: #ffffff !important; font-weight: 600;">{row['status']}</td>
+                        <td style="padding: 10px; color: #ffffff !important; font-weight: 600;">{row['vencimento_usuario']}</td>
                     </tr>
                 """
             html_users += "</tbody></table></div>"
@@ -479,26 +490,26 @@ st.divider()
 st.subheader("💵 Seus Últimos Recebimentos")
 if historico:
     html_hist = """
-    <div style="overflow-x:auto; background-color: #111827; padding: 10px; border-radius: 8px;">
-        <table style="width:100%; border-collapse: collapse; color: #ffffff; font-family: sans-serif; text-align: left;">
+    <div style="overflow-x:auto; background-color: #111827; padding: 12px; border-radius: 8px; border: 2px solid #334155;">
+        <table style="width:100%; border-collapse: collapse; font-family: sans-serif; text-align: left;">
             <thead>
                 <tr style="background-color: #1e293b; border-bottom: 2px solid #475569;">
-                    <th style="padding: 10px; color: #ffffff;">Cliente</th>
-                    <th style="padding: 10px; color: #ffffff;">Valor</th>
-                    <th style="padding: 10px; color: #ffffff;">Data</th>
+                    <th style="padding: 10px; color: #ffffff !important; font-weight: bold;">Cliente</th>
+                    <th style="padding: 10px; color: #ffffff !important; font-weight: bold;">Valor</th>
+                    <th style="padding: 10px; color: #ffffff !important; font-weight: bold;">Data</th>
                 </tr>
             </thead>
             <tbody>
     """
     for item in list(reversed(historico))[:10]:
         html_hist += f"""
-            <tr style="border-bottom: 1px solid #334155;">
-                <td style="padding: 10px; color: #ffffff !important;">{item['cliente']}</td>
-                <td style="padding: 10px; color: #ffffff !important;">R$ {item['valor']:.2f}</td>
-                <td style="padding: 10px; color: #ffffff !important;">{item['data']}</td>
+            <tr style="border-bottom: 1px solid #334155; background-color: #1e293b;">
+                <td style="padding: 10px; color: #ffffff !important; font-weight: 600;">{item['cliente']}</td>
+                <td style="padding: 10px; color: #ffffff !important; font-weight: 600;">R$ {item['valor']:.2f}</td>
+                <td style="padding: 10px; color: #ffffff !important; font-weight: 600;">{item['data']}</td>
             </tr>
         """
     html_hist += "</tbody></table></div>"
     st.markdown(html_hist, unsafe_allow_html=True)
 else: 
-    st.info("Nenhum registro seu.")
+    st.info("Nenhum registro seu encontrado.")
