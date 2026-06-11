@@ -10,7 +10,7 @@ from sqlalchemy.pool import NullPool
 # Configuração da página
 st.set_page_config(page_title="Vision Play TV", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
 
-# --- CSS SEGURO E CORRIGIDO PARA MOBILE ---
+# --- CSS SEGURO E ULTRA CORRIGIDO PARA MOBILE ---
 st.markdown("""
     <style>
     /* 1. ELIMINAR APENAS O CABEÇALHO SUPERIOR (DEPLOY, GITHUB, 3 PONTOS) */
@@ -43,7 +43,7 @@ st.markdown("""
         border-right: 2px solid #334155 !important;
     }
     
-    /* 4. FUNDO DO APP E TEXTOS */
+    /* 4. FUNDO DO APP E TEXTOS GENERALIZADOS */
     .stApp { background-color: #0b0f19 !important; }
     h1, h2, h3, h4, h5, h6 { color: #ffffff !important; font-weight: 800 !important; }
     p, span, label, .stMarkdown, [data-testid="stWidgetLabel"] p { color: #f1f5f9 !important; font-size: 16px !important; font-weight: 600 !important; }
@@ -75,8 +75,17 @@ st.markdown("""
     div[data-baseweb="popover"] ul, div[role="listbox"] { background-color: #1e293b !important; }
     div[role="listbox"] li, [data-baseweb="select"] li { color: #ffffff !important; background-color: #1e293b !important; }
 
-    /* 6. BOTÕES */
-    button, .stButton > button { 
+    /* 6. CORREÇÃO DO POPOVER (MENU DO SISTEMA TEXTO BRANCO EM FUNDO ESCURO) */
+    div[data-baseweb="popover"] {
+        background-color: #1e293b !important;
+        border: 2px solid #475569 !important;
+    }
+    div[data-baseweb="popover"] * {
+        color: #ffffff !important;
+    }
+
+    /* 7. BOTÕES SELETIVOS (CORRIGE O BUG DOS BOTÕES AZUIS NO GRÁFICO) */
+    .stButton > button, [data-testid="stFormSubmitButton"] button, div[data-baseweb="popover"] button { 
         background-color: #2563eb !important; 
         color: #ffffff !important; 
         font-weight: bold !important;
@@ -86,7 +95,7 @@ st.markdown("""
         box-shadow: 0 4px 6px rgba(0,0,0,0.4) !important;
     }
     
-    /* 7. BLOCOS DE MÉTRICAS */
+    /* 8. BLOCOS DE MÉTRICAS */
     [data-testid="stMetric"] { 
         background-color: #1e293b !important; 
         padding: 18px !important; 
@@ -96,7 +105,7 @@ st.markdown("""
     [data-testid="stMetricValue"] > div { color: #38bdf8 !important; font-weight: 800 !important; font-size: 26px !important; }
     [data-testid="stMetricLabel"] > div { color: #cbd5e1 !important; font-weight: bold !important; }
     
-    /* 8. ABAS */
+    /* 9. ABAS */
     .stTabs [data-baseweb="tab-list"] { gap: 8px; }
     .stTabs [data-baseweb="tab"] { 
         background-color: #1e293b !important; 
@@ -337,41 +346,45 @@ st.divider()
 col1, col2 = st.columns(2)
 with col1:
     if total_clientes > 0:
-        st.plotly_chart(px.pie(pd.DataFrame({"Status": ["Em Dia", "Vencendo", "Vencidos"], "Quantidade": [em_dia, vencendo, vencidos]}), names="Status", values="Quantidade", title="Seus Clientes"), use_container_width=True)
+        # config={'displayModeBar': False} remove completamente os botões desalinhados do gráfico
+        st.plotly_chart(px.pie(pd.DataFrame({"Status": ["Em Dia", "Vencendo", "Vencidos"], "Quantidade": [em_dia, vencendo, vencidos]}), names="Status", values="Quantidade", title="Seus Clientes"), use_container_width=True, config={'displayModeBar': False})
     else:
         st.info("Nenhum cliente para gerar gráfico.")
 with col2:
     if receita_prevista > 0:
-        st.plotly_chart(px.pie(pd.DataFrame({"Tipo": ["Recebido", "Pendente"], "Valor": [receita_recebida, receita_pendente]}), names="Tipo", values="Valor", title="Seu Financeiro"), use_container_width=True)
+        st.plotly_chart(px.pie(pd.DataFrame({"Tipo": ["Recebido", "Pendente"], "Valor": [receita_recebida, receita_pendente]}), names="Tipo", values="Valor", title="Seu Financeiro"), use_container_width=True, config={'displayModeBar': False})
     else:
         st.info("Financeiro zerado.")
 
 st.divider()
 
-# --- RECONSTRUÇÃO COMPLETA LINEAR DAS TABELAS HTML (EVITA O BUG DO MARKDOWN) ---
+# --- TABELA DE CLIENTES OCULTA POR PADRÃO (EXPANDER) E MAIS COMPACTA (PADDING REDUZIDO) ---
 st.subheader("📋 Lista de Clientes e Situação")
-if clientes:
-    html_table = '<div style="overflow-x:auto; background-color: #111827; padding: 12px; border-radius: 8px; border: 2px solid #334155;"><table style="width:100%; border-collapse: collapse; font-family: sans-serif; text-align: left;"><thead><tr style="background-color: #1e293b; border-bottom: 3px solid #64748b;"><th style="padding: 14px; color: #ffffff !important; font-weight: bold; font-size: 15px;">Nome</th><th style="padding: 14px; color: #ffffff !important; font-weight: bold; font-size: 15px;">WhatsApp</th><th style="padding: 14px; color: #ffffff !important; font-weight: bold; font-size: 15px;">Vencimento</th><th style="padding: 14px; color: #ffffff !important; font-weight: bold; font-size: 15px;">Status</th><th style="padding: 14px; color: #ffffff !important; font-weight: bold; font-size: 15px;">Valor</th><th style="padding: 14px; color: #ffffff !important; font-weight: bold; font-size: 15px;">Telas</th></tr></thead><tbody>'
-    for c in clientes:
-        status_lower = str(c["status"]).strip().lower()
-        if status_lower in ["recebido", "em dia"]:
-            bg_color = "#065f46"
-            border_color = "#10b981"
-        else:
-            bg_color = "#9a3412"
-            border_color = "#f97316"
-            
-        html_table += f'<tr style="background-color: {bg_color}; border-bottom: 2px solid {border_color};">'
-        html_table += f'<td style="padding: 14px; color: #ffffff !important; font-weight: bold; font-size: 15px;">{c["nome"]}</td>'
-        html_table += f'<td style="padding: 14px; color: #ffffff !important; font-weight: bold; font-size: 15px;">{c["whatsapp"]}</td>'
-        html_table += f'<td style="padding: 14px; color: #ffffff !important; font-weight: bold; font-size: 15px;">{c["vencimento"]}</td>'
-        html_table += f'<td style="padding: 14px; color: #ffffff !important; font-weight: bold; font-size: 15px;">{c["status"]}</td>'
-        html_table += f'<td style="padding: 14px; color: #ffffff !important; font-weight: bold; font-size: 15px;">R$ {c["valor"]:.2f}</td>'
-        html_table += f'<td style="padding: 14px; color: #ffffff !important; font-weight: bold; font-size: 15px;">{c["telas"]}</td></tr>'
-    html_table += "</tbody></table></div>"
-    st.markdown(html_table, unsafe_allow_html=True)
-else:
-    st.info("Nenhum cliente cadastrado.")
+
+with st.expander("👁️ Clique para Abrir / Esconder a Lista de Clientes", expanded=False):
+    if clientes:
+        # Reduzido padding de 14px para 7px e font-size para 14px para encolher os retângulos grandes
+        html_table = '<div style="overflow-x:auto; background-color: #111827; padding: 8px; border-radius: 8px; border: 2px solid #334155;"><table style="width:100%; border-collapse: collapse; font-family: sans-serif; text-align: left;"><thead><tr style="background-color: #1e293b; border-bottom: 3px solid #64748b;"><th style="padding: 7px; color: #ffffff !important; font-weight: bold; font-size: 14px;">Nome</th><th style="padding: 7px; color: #ffffff !important; font-weight: bold; font-size: 14px;">WhatsApp</th><th style="padding: 7px; color: #ffffff !important; font-weight: bold; font-size: 14px;">Vencimento</th><th style="padding: 7px; color: #ffffff !important; font-weight: bold; font-size: 14px;">Status</th><th style="padding: 7px; color: #ffffff !important; font-weight: bold; font-size: 14px;">Valor</th><th style="padding: 7px; color: #ffffff !important; font-weight: bold; font-size: 14px;">Telas</th></tr></thead><tbody>'
+        for c in clientes:
+            status_lower = str(c["status"]).strip().lower()
+            if status_lower in ["recebido", "em dia"]:
+                bg_color = "#065f46"
+                border_color = "#10b981"
+            else:
+                bg_color = "#9a3412"
+                border_color = "#f97316"
+                
+            html_table += f'<tr style="background-color: {bg_color}; border-bottom: 2px solid {border_color};">'
+            html_table += f'<td style="padding: 7px; color: #ffffff !important; font-weight: bold; font-size: 14px;">{c["nome"]}</td>'
+            html_table += f'<td style="padding: 7px; color: #ffffff !important; font-weight: bold; font-size: 14px;">{c["whatsapp"]}</td>'
+            html_table += f'<td style="padding: 7px; color: #ffffff !important; font-weight: bold; font-size: 14px;">{c["vencimento"]}</td>'
+            html_table += f'<td style="padding: 7px; color: #ffffff !important; font-weight: bold; font-size: 14px;">{c["status"]}</td>'
+            html_table += f'<td style="padding: 7px; color: #ffffff !important; font-weight: bold; font-size: 14px;">R$ {c["valor"]:.2f}</td>'
+            html_table += f'<td style="padding: 7px; color: #ffffff !important; font-weight: bold; font-size: 14px;">{c["telas"]}</td></tr>'
+        html_table += "</tbody></table></div>"
+        st.markdown(html_table, unsafe_allow_html=True)
+    else:
+        st.info("Nenhum cliente cadastrado.")
 
 st.divider()
 
@@ -413,7 +426,7 @@ with abas[1]:
                         conn.execute(text("INSERT INTO vision_clientes (nome, whatsapp, vencimento, status, valor, telas, usuario_owner) VALUES (:n, :w, :v, :s, :val, :t, :owner)"), {"n": n_nome.strip(), "w": n_whats.strip(), "v": n_venc.strip(), "s": n_status, "val": n_valor, "t": int(n_telas), "owner": USUARIO_LOGADO})
                     st.success("Cliente cadastrado com sucesso!")
                     st.rerun()
-                except: st.error("Erro: Um cliente com esse nome já existe.")
+                except: st.error("Erro ao salvar cliente.")
 
 with abas[2]:
     if clientes:
@@ -455,19 +468,22 @@ if ROLE_LOGADO == "ADM":
         with engine.connect() as conn:
             df_users = pd.DataFrame(conn.execute(text("SELECT id, username, password, role, status, vencimento_usuario FROM vision_usuarios")).mappings().fetchall())
         if not df_users.empty:
-            html_users = '<div style="overflow-x:auto; background-color: #111827; padding: 12px; border-radius: 8px; border: 2px solid #334155;"><table style="width:100%; border-collapse: collapse; font-family: sans-serif; text-align: left;"><thead><tr style="background-color: #1e293b; border-bottom: 2px solid #475569;"><th style="padding: 10px; color: #ffffff !important; font-weight: bold;">ID</th><th style="padding: 10px; color: #ffffff !important; font-weight: bold;">Usuário</th><th style="padding: 10px; color: #ffffff !important; font-weight: bold;">Senha</th><th style="padding: 10px; color: #ffffff !important; font-weight: bold;">Nível</th><th style="padding: 10px; color: #ffffff !important; font-weight: bold;">Status</th><th style="padding: 10px; color: #ffffff !important; font-weight: bold;">Vencimento</th></tr></thead><tbody>'
+            html_users = '<div style="overflow-x:auto; background-color: #111827; padding: 12px; border-radius: 8px; border: 2px solid #334155;"><table style="width:100%; border-collapse: collapse; font-family: sans-serif; text-align: left;"><thead><tr style="background-color: #1e293b; border-bottom: 2px solid #475569;"><th style="padding: 6px; color: #ffffff !important; font-weight: bold;">ID</th><th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Usuário</th><th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Senha</th><th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Nível</th><th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Status</th><th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Vencimento</th></tr></thead><tbody>'
             for idx, row in df_users.iterrows():
-                html_users += f'<tr style="border-bottom: 1px solid #334155; background-color: #1e293b;"><td style="padding: 10px; color: #ffffff !important; font-weight: 600;">{row["id"]}</td><td style="padding: 10px; color: #ffffff !important; font-weight: 600;">{row["username"]}</td><td style="padding: 10px; color: #ffffff !important; font-weight: 600;">{row["password"]}</td><td style="padding: 10px; color: #ffffff !important; font-weight: 600;">{row["role"]}</td><td style="padding: 10px; color: #ffffff !important; font-weight: 600;">{row["status"]}</td><td style="padding: 10px; color: #ffffff !important; font-weight: 600;">{row["vencimento_usuario"]}</td></tr>'
+                html_users += f'<tr style="border-bottom: 1px solid #334155; background-color: #1e293b;"><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">{row["id"]}</td><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">{row["username"]}</td><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">{row["password"]}</td><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">{row["role"]}</td><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">{row["status"]}</td><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">{row["vencimento_usuario"]}</td></tr>'
             html_users += "</tbody></table></div>"
             st.markdown(html_users, unsafe_allow_html=True)
 
 st.divider()
+
+# --- HISTÓRICO OCULTO POR PADRÃO DENTRO DE OUTRO EXPANDER COMPACTO ---
 st.subheader("💵 Seus Últimos Recebimentos")
-if historico:
-    html_hist = '<div style="overflow-x:auto; background-color: #111827; padding: 12px; border-radius: 8px; border: 2px solid #334155;"><table style="width:100%; border-collapse: collapse; font-family: sans-serif; text-align: left;"><thead><tr style="background-color: #1e293b; border-bottom: 2px solid #475569;"><th style="padding: 10px; color: #ffffff !important; font-weight: bold;">Cliente</th><th style="padding: 10px; color: #ffffff !important; font-weight: bold;">Valor</th><th style="padding: 10px; color: #ffffff !important; font-weight: bold;">Data</th></tr></thead><tbody>'
-    for item in list(reversed(historico))[:10]:
-        html_hist += f'<tr style="border-bottom: 1px solid #334155; background-color: #1e293b;"><td style="padding: 10px; color: #ffffff !important; font-weight: 600;">{item["cliente"]}</td><td style="padding: 10px; color: #ffffff !important; font-weight: 600;">R$ {item["valor"]:.2f}</td><td style="padding: 10px; color: #ffffff !important; font-weight: 600;">{item["data"]}</td></tr>'
-    html_hist += "</tbody></table></div>"
-    st.markdown(html_hist, unsafe_allow_html=True)
-else: 
-    st.info("Nenhum registro seu encontrado.")
+with st.expander("👁️ Clique para Abrir / Esconder o Histórico de Recebimentos", expanded=False):
+    if historico:
+        html_hist = '<div style="overflow-x:auto; background-color: #111827; padding: 8px; border-radius: 8px; border: 2px solid #334155;"><table style="width:100%; border-collapse: collapse; font-family: sans-serif; text-align: left;"><thead><tr style="background-color: #1e293b; border-bottom: 2px solid #475569;"><th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Cliente</th><th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Valor</th><th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Data</th></tr></thead><tbody>'
+        for item in list(reversed(historico))[:10]:
+            html_hist += f'<tr style="border-bottom: 1px solid #334155; background-color: #1e293b;"><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">{item["cliente"]}</td><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">R$ {item["valor"]:.2f}</td><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">{item["data"]}</td></tr>'
+        html_hist += "</tbody></table></div>"
+        st.markdown(html_hist, unsafe_allow_html=True)
+    else: 
+        st.info("Nenhum registro seu encontrado.")
