@@ -283,6 +283,27 @@ if ROLE_LOGADO == "ADM":
 if menu_opcoes.button("🧹 Limpar Histórico", use_container_width=True, key=f"clean_{USUARIO_LOGADO}"):
     abrir_popup_limpeza()
 
+# ------------------------------------------------------------------------------
+# FUNÇÃO OCULTA: TABELA DINÂMICA DE STATUS DOS CLIENTES (VERDE / VERMELHO)
+# ------------------------------------------------------------------------------
+with menu_opcoes.expander("📊 Status Geral dos Clientes", expanded=False):
+    if clientes:
+        df_status = pd.DataFrame(clientes)[["nome", "status", "vencimento"]]
+        df_status.columns = ["Cliente", "Status", "Vencimento"]
+        
+        def aplicar_cores_status(row):
+            # Define verde para contas pagas/em dia e vermelho para vencidas/pendentes
+            cor_pago = "background-color: #064e3b !important; color: #ffffff !important;"
+            cor_pendente = "background-color: #7f1d1d !important; color: #ffffff !important;"
+            
+            estilo = cor_pago if row["Status"] in ["Recebido", "Em Dia"] else cor_pendente
+            return [estilo] * len(row)
+            
+        st.dataframe(df_status.style.apply(aplicar_cores_status, axis=1), use_container_width=True, hide_index=True)
+    else:
+        st.info("Nenhum cliente cadastrado.")
+# ------------------------------------------------------------------------------
+
 if menu_opcoes.button("🚪 Sair", use_container_width=True, key=f"exit_{USUARIO_LOGADO}"):
     st.session_state.clear()
     st.rerun()
