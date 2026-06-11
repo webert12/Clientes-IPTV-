@@ -10,7 +10,7 @@ st.title("👥 Gestão de Clientes")
 ARQ = Path("clientes.json")
 
 if not ARQ.exists():
-ARQ.write_text("[]", encoding="utf-8")
+ARQ.write_text("[]", encoding="utf-8"):
 
 # 🔥 IMPORTANTE: sempre recarregar dados atualizados
 def carregar_clientes():
