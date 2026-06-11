@@ -10,7 +10,7 @@ from sqlalchemy.pool import NullPool
 # Configuração da página
 st.set_page_config(page_title="Vision Play TV", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
 
-# --- CSS PARA TRANSPARÊNCIA 100% E CORREÇÃO CRÍTICA DE VISIBILIDADE DE TEXTOS ---
+# --- CSS PARA TRANSPARÊNCIA 100% E CORREÇÃO CRÍTICA DE VISIBILIDADE ---
 st.markdown("""
     <style>
     /* Ocultar completamente o cabeçalho padrão, menu nativo, deploy e ícones do GitHub */
@@ -31,7 +31,7 @@ st.markdown("""
     /* Fundo Geral do App */
     .stApp { background-color: #0b0f19 !important; }
     
-    /* Forçar cores de textos e títulos específicos (evitando quebra de tabelas internas) */
+    /* Forçar cores de textos e títulos específicos (sem quebrar tabelas de canvas internas) */
     h1, h2, h3, h4, p, label, .stMetric label { 
         color: #ffffff !important; 
     }
@@ -65,19 +65,21 @@ st.markdown("""
         border-radius: 12px !important;
     }
     
-    /* Menu Popover Principal 100% Transparente */
+    /* CORREÇÃO DO POPOVER (MENU) - Remove completamente o bloco branco da folha de estilos */
+    div[data-baseweb="popover"],
+    div[data-baseweb="popover"] > div,
     div[data-testid="stPopoverBody"] {
-        background-color: rgba(11, 15, 25, 0.95) !important;
+        background-color: #0b0f19 !important;
+        background: #0b0f19 !important;
         border: 2px solid #3b82f6 !important;
-        border-radius: 10px !important;
-        backdrop-filter: blur(10px);
+        border-radius: 12px !important;
+        box-shadow: none !important;
     }
     
-    /* Dropdowns de Opções (Selectbox e Menus de Seleção) */
-    div[data-baseweb="popover"] > div, 
+    /* Dropdowns de Opções (Selectbox internos do menu) */
     ul[data-baseweb="menu"], 
     li[role="option"] {
-        background-color: #1e293b !important;
+        background-color: #0b0f19 !important;
         color: #ffffff !important;
     }
     li[role="option"]:hover {
@@ -109,8 +111,9 @@ st.markdown("""
         border-radius: 6px !important;
     }
 
-    /* Correção do Container de Tabelas Dataframe */
-    div[data-testid="stDataFrame"] {
+    /* CORREÇÃO CRÍTICA DA TABELA - Garante fundo transparente e herança de cor correta */
+    div[data-testid="stDataFrame"], 
+    div[data-testid="stDataFrame"] > div {
         background-color: transparent !important;
     }
     </style>
@@ -350,7 +353,7 @@ receita_pendente = receita_prevista - receita_recebida
 
 
 # ==============================================================================
-# RENDERIZAÇÃO CONDICIONAL DE TELAS (LUGAR DO DASHBOARD)
+# RENDERIZAÇÃO CONDICIONAL DE TELAS
 # ==============================================================================
 
 if st.session_state["pagina_atual"] == "dashboard":
@@ -386,16 +389,15 @@ if st.session_state["pagina_atual"] == "dashboard":
 elif st.session_state["pagina_atual"] == "clientes":
     st.title("👥 Gerenciamento de Clientes")
     
-    # EXIBIÇÃO DE STATUS COM CORES AJUSTADAS PARA ALTO CONTRASTE E TRANSPARÊNCIA
     st.subheader("📋 Status Geral de Pagamentos")
     if clientes:
         df_status = pd.DataFrame(clientes)[["nome", "status", "vencimento"]]
         df_status.columns = ["Nome do Cliente", "Status Atual", "Vencimento"]
         
+        # CORREÇÃO DA FUNÇÃO: Removido o '!important' de dentro das strings de estilo do Pandas
         def aplicar_cores_status(row):
-            # Fundos semitransparentes com bordas/textos brilhantes para manter a legibilidade e estética transparente
-            cor_pago = "background-color: rgba(16, 185, 129, 0.2) !important; color: #10b981 !important; font-weight: bold !important;"
-            cor_pendente = "background-color: rgba(239, 68, 68, 0.2) !important; color: #ef4444 !important; font-weight: bold !important;"
+            cor_pago = "background-color: rgba(16, 185, 129, 0.2); color: #10b981; font-weight: bold;"
+            cor_pendente = "background-color: rgba(239, 68, 68, 0.2); color: #ef4444; font-weight: bold;"
             
             estilo = cor_pago if row["Status Atual"] in ["Recebido", "Em Dia"] else cor_pendente
             return [estilo] * len(row)
