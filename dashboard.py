@@ -45,7 +45,7 @@ st.markdown("""
     h1, h2, h3, h4, h5, h6 { color: #ffffff !important; font-weight: 800 !important; }
     p, span, label, .stMarkdown, [data-testid="stWidgetLabel"] p { color: #f1f5f9 !important; font-size: 16px !important; font-weight: 600 !important; }
     
-    /* 5. CORREÇÃO COMPLETA DAS CAIXAS DE SELEÇÃO (SELECTBOX / DROPDOWN TEXTO INVISÍVEL AO BUSCAR) */
+    /* 5. CORREÇÃO COMPLETA DAS CAIXAS DE SELEÇÃO (SELECTBOX / DROPDOWN TEXTO INVISÍVEL) */
     div[data-baseweb="select"] > div {
         background-color: #1e293b !important;
         color: #ffffff !important;
@@ -54,24 +54,18 @@ st.markdown("""
     div[data-baseweb="select"] span, div[data-baseweb="select"] div {
         color: #ffffff !important;
     }
-    /* Forçar visibilidade do texto digitado na busca de clientes */
-    div[data-baseweb="select"] input {
-        color: #ffffff !important;
-        -webkit-text-fill-color: #ffffff !important;
-    }
     
-    /* Opções internas do menu suspenso ao clicar no celular e desktop */
-    div[data-baseweb="popover"] div[role="listbox"], div[role="listbox"], [data-baseweb="menu"], [role="option"], li[role="option"] {
+    /* Opções internas do menu suspenso ao clicar no celular */
+    div[data-baseweb="popover"] div[role="listbox"], div[role="listbox"] {
         background-color: #1e293b !important;
         color: #ffffff !important;
     }
-    div[role="listbox"] li, [data-baseweb="select"] li, [role="option"] * {
+    div[role="listbox"] li, [data-baseweb="select"] li {
         background-color: #1e293b !important;
         color: #ffffff !important;
     }
-    div[role="listbox"] li:hover, [data-baseweb="select"] li:hover, li[role="option"]:hover {
+    div[role="listbox"] li:hover, [data-baseweb="select"] li:hover {
         background-color: #334155 !important;
-        color: #ffffff !important;
     }
 
     /* 6. CORREÇÃO DOS TEXTOS DO POPOVER (MENU DO SISTEMA CORES) */
@@ -85,11 +79,11 @@ st.markdown("""
     div[data-testid="stPopover"] button p {
         color: #ffffff !important;
     }
-    div[data-baseweb="popover"], [data-testid="stPopoverBody"] {
+    div[data-baseweb="popover"] {
         background-color: #1e293b !important;
         border: 2px solid #475569 !important;
     }
-    div[data-baseweb="popover"] *, [data-testid="stPopoverBody"] * {
+    div[data-baseweb="popover"] * {
         color: #ffffff !important;
     }
 
@@ -241,16 +235,16 @@ if not st.session_state["logado"]:
 USUARIO_LOGADO = st.session_state["usuario_nome"]
 ROLE_LOGADO = st.session_state["usuario_role"]
 
-# Menu Customizado Popover
-with st.popover("Menu do Sistema"):
-    st.markdown("### 📋 Opções")
+# --- CORREÇÃO 1: MENU EXTRAÍDO DO POPOVER E MOVIDO DIRETAMENTE PARA A BARRA LATERAL ---
+with st.sidebar:
+    st.markdown("## 📋 Menu Vision Play")
     st.markdown(f"👤 **Usuário:** `{USUARIO_LOGADO}`")
     st.markdown(f"🎖️ **Nível:** `{ROLE_LOGADO}`")
     st.divider()
     if ROLE_LOGADO == "ADM":
         if st.button("🔄 Sincronizar Banco", use_container_width=True):
             st.rerun()
-    if st.button("🚪 Sair", use_container_width=True):
+    if st.button("🚪 Sair do Sistema", use_container_width=True):
         st.session_state.clear()
         st.rerun()
 
@@ -270,30 +264,30 @@ total_clientes = len(clientes)
 em_dia, vencendo, vencidos = 0, 0, 0
 receita_prevista, receita_recebida = 0, 0
 
+# Variáveis para cálculo financeiro preciso do gráfico de pizza solicitado
+valor_pago = 0.0
+valor_vencido = 0.0
+valor_a_vencer = 0.0
+
 for cl in clientes:
     receita_prevista += cl["valor"]
+    status_limpo = str(cl["status"]).strip().lower()
+    
+    # Separação por regras de status informados
+    if status_limpo in ["em dia", "recebido", "pago"]:
+        valor_pago += cl["valor"]
+    elif status_limpo in ["vencido", "vencidos"]:
+        valor_vencido += cl["valor"]
+    else: # vencendo / pendente
+        valor_a_vencer += cl["valor"]
+
     try:
         v_dt = datetime.strptime(cl["vencimento"], "%d/%m/%Y").date()
         dias = (v_dt - hoje).days
-        if dias < 0:
-            cl["status"] = "Vencidos"
-            vencidos += 1
-        elif dias <= 2:
-            cl["status"] = "Vencendo"
-            vencendo += 1
-        else:
-            cl["status"] = "Em Dia"
-            em_dia += 1
-    except:
-        if str(cl["status"]).strip().lower() in ["em dia", "recebido"]:
-            cl["status"] = "Em Dia"
-            em_dia += 1
-        elif str(cl["status"]).strip().lower() == "vencendo":
-            cl["status"] = "Vencendo"
-            vencendo += 1
-        else:
-            cl["status"] = "Vencidos"
-            vencidos += 1
+        if dias < 0: vencidos += 1
+        elif dias <= 2: vencendo += 1
+        else: em_dia += 1
+    except: em_dia += 1
 
 for item in historico: receita_recebida += item["valor"]
 receita_pendente = max(0.0, receita_prevista - receita_recebida)
@@ -313,41 +307,44 @@ with col1:
     if total_clientes > 0:
         df_cli = pd.DataFrame({"Status": ["Em Dia", "Vencendo", "Vencidos"], "Qtd": [em_dia, vencendo, vencidos]})
         df_cli = df_cli[df_cli["Qtd"] > 0]
-        fig_cli = px.pie(df_cli, names="Status", values="Qtd", title="Situação dos Clientes",
+        fig_cli = px.pie(df_cli, names="Status", values="Qtd", title="Situação dos Clientes (Quantidade)",
                          color="Status", color_discrete_map={"Em Dia": "#10b981", "Vencendo": "#f59e0b", "Vencidos": "#ef4444"})
-        # Forçado o textfont com cor fixa branca para total legibilidade das porcentagens na pizza
-        fig_cli.update_traces(textposition='inside', textinfo='percent+label', textfont=dict(color='#ffffff', size=14))
         fig_cli.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='#ffffff', title_font_color='#ffffff', legend_font_color='#ffffff')
         st.plotly_chart(fig_cli, use_container_width=True, config={'displayModeBar': False})
     else: st.info("Nenhum cliente para gerar gráfico.")
 
 with col2:
+    # --- CORREÇÃO 2: GRÁFICO FINANCEIRO EXIBINDO PAGO, VENCIDO E A VENCER ---
     if receita_prevista > 0:
-        df_fin = pd.DataFrame({"Tipo": ["Recebido", "Pendente"], "Valor": [receita_recebida, receita_pendente]})
+        df_fin = pd.DataFrame({
+            "Tipo": ["Pago", "Vencido", "A Vencer"], 
+            "Valor": [valor_pago, valor_vencido, valor_a_vencer]
+        })
         df_fin = df_fin[df_fin["Valor"] > 0]
-        fig_fin = px.pie(df_fin, names="Tipo", values="Valor", title="Divisão Financeira",
-                         color="Tipo", color_discrete_map={"Recebido": "#10b981", "Pendente": "#ef4444"})
-        # Forçado o textfont com cor fixa branca para total legibilidade das porcentagens na pizza
-        fig_fin.update_traces(textposition='inside', textinfo='percent+label', textfont=dict(color='#ffffff', size=14))
+        fig_fin = px.pie(df_fin, names="Tipo", values="Valor", title="Divisão Financeira (R$)",
+                         color="Tipo", color_discrete_map={"Pago": "#10b981", "Vencido": "#ef4444", "A Vencer": "#f59e0b"})
         fig_fin.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='#ffffff', title_font_color='#ffffff', legend_font_color='#ffffff')
         st.plotly_chart(fig_fin, use_container_width=True, config={'displayModeBar': False})
     else: st.info("Financeiro zerado.")
 
 st.divider()
 
-# --- TABELA COMPACTA OCULTA POR PADRÃO (DENTRO DE EXPANDER) ---
+# --- TABELA COMPACTA COM CORREÇÃO DAS CORES DINÂMICAS ---
 st.subheader("📋 Lista de Clientes e Situação")
 with st.expander("👁️ Clique para Abrir / Esconder a Lista de Clientes", expanded=False):
     if clientes:
         html_table = '<div style="overflow-x:auto; background-color: #111827; padding: 6px; border-radius: 8px; border: 2px solid #334155;"><table style="width:100%; border-collapse: collapse; text-align: left;"><thead><tr style="background-color: #1e293b; border-bottom: 2px solid #64748b;"><th style="padding: 6px; color: #ffffff !important; font-size: 14px;">Nome</th><th style="padding: 6px; color: #ffffff !important; font-size: 14px;">WhatsApp</th><th style="padding: 6px; color: #ffffff !important; font-size: 14px;">Vencimento</th><th style="padding: 6px; color: #ffffff !important; font-size: 14px;">Status</th><th style="padding: 6px; color: #ffffff !important; font-size: 14px;">Valor</th><th style="padding: 6px; color: #ffffff !important; font-size: 14px;">Telas</th></tr></thead><tbody>'
         for c in clientes:
             status_limpo = str(c["status"]).strip().lower()
-            if status_limpo in ["recebido", "em dia"]:
-                bg = "#065f46"
-            elif status_limpo == "vencendo":
-                bg = "#b45309"
+            
+            # --- CORREÇÃO 3: SEPARAÇÃO REAL DE CORES (VERDE, VERMELHO E AMARELO INDEPENDENTES) ---
+            if status_limpo in ["em dia", "recebido", "pago"]:
+                bg = "#065f46"  # Verde escuro nítido para pagantes
+            elif status_limpo in ["vencido", "vencidos"]:
+                bg = "#991b1b"  # Vermelho fechado para vencidos
             else:
-                bg = "#991b1b"
+                bg = "#854d0e"  # Amarelo/Ouro escuro para pendentes / vencendo
+                
             html_table += f'<tr style="background-color: {bg}; border-bottom: 1px solid #475569;"><td style="padding: 6px; color: #ffffff !important; font-weight: bold; font-size: 13px;">{c["nome"]}</td><td style="padding: 6px; color: #ffffff !important; font-size: 13px;">{c["whatsapp"]}</td><td style="padding: 6px; color: #ffffff !important; font-size: 13px;">{c["vencimento"]}</td><td style="padding: 6px; color: #ffffff !important; font-size: 13px;">{c["status"]}</td><td style="padding: 6px; color: #ffffff !important; font-size: 13px;">R$ {c["valor"]:.2f}</td><td style="padding: 6px; color: #ffffff !important; font-size: 13px;">{c["telas"]}</td></tr>'
         html_table += "</tbody></table></div>"
         st.markdown(html_table, unsafe_allow_html=True)
@@ -369,13 +366,7 @@ with abas[0]:
         cli = next(c for c in clientes if c["nome"] == sel)
         st.write(f"💰 Valor da mensalidade: **R$ {cli['valor']:.2f}**")
         if st.button("⚡ Confirmar Pagamento", use_container_width=True):
-            try:
-                base_date = datetime.strptime(cli["vencimento"], "%d/%m/%Y").date()
-                if base_date < hoje:
-                    base_date = hoje
-            except:
-                base_date = hoje
-            prox_venc = (base_date + timedelta(days=30)).strftime("%d/%m/%Y")
+            prox_venc = (datetime.strptime(cli["vencimento"], "%d/%m/%Y") + timedelta(days=30)).strftime("%d/%m/%Y")
             with engine.begin() as conn:
                 conn.execute(text("UPDATE vision_clientes SET status = 'Em Dia', vencimento = :v WHERE nome = :n AND usuario_owner = :o"), {"v": prox_venc, "n": cli["nome"], "o": USUARIO_LOGADO})
                 conn.execute(text("INSERT INTO vision_historico (cliente, valor, data, usuario_owner) VALUES (:c, :v, :d, :o)"), {"c": cli["nome"], "v": cli["valor"], "d": agora_br.strftime("%d/%m/%Y %H:%M"), "o": USUARIO_LOGADO})
