@@ -394,7 +394,6 @@ elif st.session_state["pagina_atual"] == "clientes":
         df_status = pd.DataFrame(clientes)[["nome", "status", "vencimento"]]
         df_status.columns = ["Nome do Cliente", "Status Atual", "Vencimento"]
         
-        # CORREÇÃO DA FUNÇÃO: Removido o '!important' de dentro das strings de estilo do Pandas
         def aplicar_cores_status(row):
             cor_pago = "background-color: rgba(16, 185, 129, 0.2); color: #10b981; font-weight: bold;"
             cor_pendente = "background-color: rgba(239, 68, 68, 0.2); color: #ef4444; font-weight: bold;"
@@ -468,23 +467,71 @@ elif st.session_state["pagina_atual"] == "clientes":
                         conn.execute(text("DELETE FROM vision_clientes WHERE nome=:n AND TRIM(LOWER(usuario_owner))=:owner"), {"n": cli_ed["nome"], "owner": USUARIO_LOGADO})
                     st.rerun()
 
+    # --- EDICÃO E EXCLUSÃO DE REVENDEDORES (PAINEL ADM) ---
     if ROLE_LOGADO == "ADM":
         with abas[3]:
             st.subheader("Gerenciar Revendedores/Usuários")
-            with st.form(f"f_new_usr_{USUARIO_LOGADO}", clear_on_submit=True):
-                u_nome = st.text_input("Login:").strip().lower()
-                u_pass = st.text_input("Senha:").strip()
-                u_role = st.selectbox("Nível:", ["USER", "ADM"])
-                u_dias = st.number_input("Dias de Vencimento (Conta):", min_value=1, value=30)
-                if st.form_submit_button("Criar Conta"):
-                    venc = (hoje + timedelta(days=u_dias)).strftime("%d/%m/%Y")
-                    try:
-                        with engine.begin() as conn:
-                            conn.execute(text("INSERT INTO vision_usuarios (username, password, role, status, tipo_conta, vencimento_usuario) VALUES (:u, :p, :r, 'Ativo', 'Final', :v)"), {"u": u_nome, "p": u_pass, "r": u_role, "v": venc})
-                        st.success("Conta criada!")
-                        st.rerun()
-                    except: st.error("Login já existe.")
-            st.divider()
+            
+            # Divide o espaço em duas colunas organizadas
+            col_u1, col_u2 = st.columns(2)
+            
+            with col_u1:
+                st.markdown("### ➕ Criar Conta")
+                with st.form(f"f_new_usr_{USUARIO_LOGADO}", clear_on_submit=True):
+                    u_nome = st.text_input("Login:").strip().lower()
+                    u_pass = st.text_input("Senha:").strip()
+                    u_role = st.selectbox("Nível:", ["USER", "ADM"])
+                    u_dias = st.number_input("Dias de Vencimento (Conta):", min_value=1, value=30)
+                    if st.form_submit_button("Criar Conta"):
+                        venc = (hoje + timedelta(days=u_dias)).strftime("%d/%m/%Y")
+                        try:
+                            with engine.begin() as conn:
+                                conn.execute(text("INSERT INTO vision_usuarios (username, password, role, status, tipo_conta, vencimento_usuario) VALUES (:u, :p, :r, 'Ativo', 'Final', :v)"), {"u": u_nome, "p": u_pass, "r": u_role, "v": venc})
+                            st.success("Conta criada!")
+                            st.rerun()
+                        except: st.error("Login já existe.")
+            
+            # Carrega a lista completa de usuários cadastrados
             with engine.connect() as conn:
-                df_users = pd.DataFrame(conn.execute(text("SELECT id, username, password, role, status, vencimento_usuario FROM vision_usuarios")).mappings().fetchall())
-            if not df_users.empty: st.dataframe(df_users, hide_index=True)
+                lista_usuarios = conn.execute(text("SELECT username, password, role, status, vencimento_usuario FROM vision_usuarios ORDER BY username")).mappings().fetchall()
+            
+            with col_u2:
+                st.markdown("### ✏️ Editar / Excluir Revendedor")
+                if lista_usuarios:
+                    u_seletor = [usr["username"] for usr in lista_usuarios]
+                    sel_usr_nome = st.selectbox("Selecione o Usuário:", u_seletor, key=f"sel_usr_{USUARIO_LOGADO}")
+                    usr_ed = next(usr for usr in lista_usuarios if usr["username"] == sel_usr_nome)
+                    
+                    with st.form(f"f_ed_usr_{sel_usr_nome}"):
+                        e_u_pass = st.text_input("Senha Atual/Nova:", value=usr_ed["password"])
+                        e_u_role = st.selectbox("Nível:", ["USER", "ADM"], index=["USER", "ADM"].index(usr_ed["role"]) if usr_ed["role"] in ["USER", "ADM"] else 0)
+                        e_u_status = st.selectbox("Status:", ["Ativo", "Bloqueado"], index=["Ativo", "Bloqueado"].index(usr_ed["status"]) if usr_ed["status"] in ["Ativo", "Bloqueado"] else 0)
+                        e_u_venc = st.text_input("Vencimento (dd/mm/aaaa):", value=usr_ed["vencimento_usuario"])
+                        
+                        c_ubtn1, c_ubtn2 = st.columns(2)
+                        if c_ubtn1.form_submit_button("💾 Salvar Alterações"):
+                            with engine.begin() as conn:
+                                conn.execute(text("""
+                                    UPDATE vision_usuarios 
+                                    SET password = :p, role = :r, status = :s, vencimento_usuario = :v 
+                                    WHERE username = :u
+                                """), {"p": e_u_pass, "r": e_u_role, "s": e_u_status, "v": e_u_venc, "u": sel_usr_nome})
+                            st.success("Usuário atualizado com sucesso!")
+                            st.rerun()
+                            
+                        if c_ubtn2.form_submit_button("🚨 Deletar Conta"):
+                            if sel_usr_nome == USUARIO_LOGADO:
+                                st.error("Você não pode deletar a sua própria conta em uso!")
+                            else:
+                                with engine.begin() as conn:
+                                    conn.execute(text("DELETE FROM vision_usuarios WHERE username = :u"), {"u": sel_usr_nome})
+                                st.success(f"Conta '{sel_usr_nome}' removida!")
+                                st.rerun()
+                else:
+                    st.info("Nenhum usuário cadastrado para edição.")
+            
+            st.divider()
+            st.markdown("### 📋 Lista Geral de Contas Cadastradas")
+            if lista_usuarios:
+                df_users = pd.DataFrame(lista_usuarios)
+                st.dataframe(df_users, hide_index=True, use_container_width=True)
