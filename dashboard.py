@@ -56,7 +56,7 @@ st.markdown("""
     }
     
     /* Opções internas do menu suspenso ao clicar no celular */
-    div[data-baseweb="popover"] div[role="listbox"], div[role="listbox"] {
+    div[data-baseweb="popover"] div[role="listbox"], div[role="listbox"], [data-baseweb="menu"] {
         background-color: #1e293b !important;
         color: #ffffff !important;
     }
@@ -269,10 +269,25 @@ for cl in clientes:
     try:
         v_dt = datetime.strptime(cl["vencimento"], "%d/%m/%Y").date()
         dias = (v_dt - hoje).days
-        if dias < 0: vencidos += 1
-        elif dias <= 2: vencendo += 1
-        else: em_dia += 1
-    except: em_dia += 1
+        if dias < 0:
+            cl["status"] = "Vencidos"
+            vencidos += 1
+        elif dias <= 2:
+            cl["status"] = "Vencendo"
+            vencendo += 1
+        else:
+            cl["status"] = "Em Dia"
+            em_dia += 1
+    except:
+        if str(cl["status"]).strip().lower() in ["em dia", "recebido"]:
+            cl["status"] = "Em Dia"
+            em_dia += 1
+        elif str(cl["status"]).strip().lower() == "vencendo":
+            cl["status"] = "Vencendo"
+            vencendo += 1
+        else:
+            cl["status"] = "Vencidos"
+            vencidos += 1
 
 for item in historico: receita_recebida += item["valor"]
 receita_pendente = max(0.0, receita_prevista - receita_recebida)
@@ -294,6 +309,7 @@ with col1:
         df_cli = df_cli[df_cli["Qtd"] > 0]
         fig_cli = px.pie(df_cli, names="Status", values="Qtd", title="Situação dos Clientes",
                          color="Status", color_discrete_map={"Em Dia": "#10b981", "Vencendo": "#f59e0b", "Vencidos": "#ef4444"})
+        fig_cli.update_traces(textposition='inside', textinfo='percent+label')
         fig_cli.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='#ffffff', title_font_color='#ffffff', legend_font_color='#ffffff')
         st.plotly_chart(fig_cli, use_container_width=True, config={'displayModeBar': False})
     else: st.info("Nenhum cliente para gerar gráfico.")
@@ -304,6 +320,7 @@ with col2:
         df_fin = df_fin[df_fin["Valor"] > 0]
         fig_fin = px.pie(df_fin, names="Tipo", values="Valor", title="Divisão Financeira",
                          color="Tipo", color_discrete_map={"Recebido": "#10b981", "Pendente": "#ef4444"})
+        fig_fin.update_traces(textposition='inside', textinfo='percent+label')
         fig_fin.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='#ffffff', title_font_color='#ffffff', legend_font_color='#ffffff')
         st.plotly_chart(fig_fin, use_container_width=True, config={'displayModeBar': False})
     else: st.info("Financeiro zerado.")
@@ -316,7 +333,13 @@ with st.expander("👁️ Clique para Abrir / Esconder a Lista de Clientes", exp
     if clientes:
         html_table = '<div style="overflow-x:auto; background-color: #111827; padding: 6px; border-radius: 8px; border: 2px solid #334155;"><table style="width:100%; border-collapse: collapse; text-align: left;"><thead><tr style="background-color: #1e293b; border-bottom: 2px solid #64748b;"><th style="padding: 6px; color: #ffffff !important; font-size: 14px;">Nome</th><th style="padding: 6px; color: #ffffff !important; font-size: 14px;">WhatsApp</th><th style="padding: 6px; color: #ffffff !important; font-size: 14px;">Vencimento</th><th style="padding: 6px; color: #ffffff !important; font-size: 14px;">Status</th><th style="padding: 6px; color: #ffffff !important; font-size: 14px;">Valor</th><th style="padding: 6px; color: #ffffff !important; font-size: 14px;">Telas</th></tr></thead><tbody>'
         for c in clientes:
-            bg = "#065f46" if str(c["status"]).strip().lower() in ["recebido", "em dia"] else "#9a3412"
+            status_limpo = str(c["status"]).strip().lower()
+            if status_limpo in ["recebido", "em dia"]:
+                bg = "#065f46"
+            elif status_limpo == "vencendo":
+                bg = "#b45309"
+            else:
+                bg = "#991b1b"
             html_table += f'<tr style="background-color: {bg}; border-bottom: 1px solid #475569;"><td style="padding: 6px; color: #ffffff !important; font-weight: bold; font-size: 13px;">{c["nome"]}</td><td style="padding: 6px; color: #ffffff !important; font-size: 13px;">{c["whatsapp"]}</td><td style="padding: 6px; color: #ffffff !important; font-size: 13px;">{c["vencimento"]}</td><td style="padding: 6px; color: #ffffff !important; font-size: 13px;">{c["status"]}</td><td style="padding: 6px; color: #ffffff !important; font-size: 13px;">R$ {c["valor"]:.2f}</td><td style="padding: 6px; color: #ffffff !important; font-size: 13px;">{c["telas"]}</td></tr>'
         html_table += "</tbody></table></div>"
         st.markdown(html_table, unsafe_allow_html=True)
@@ -338,7 +361,13 @@ with abas[0]:
         cli = next(c for c in clientes if c["nome"] == sel)
         st.write(f"💰 Valor da mensalidade: **R$ {cli['valor']:.2f}**")
         if st.button("⚡ Confirmar Pagamento", use_container_width=True):
-            prox_venc = (datetime.strptime(cli["vencimento"], "%d/%m/%Y") + timedelta(days=30)).strftime("%d/%m/%Y")
+            try:
+                base_date = datetime.strptime(cli["vencimento"], "%d/%m/%Y").date()
+                if base_date < hoje:
+                    base_date = hoje
+            except:
+                base_date = hoje
+            prox_venc = (base_date + timedelta(days=30)).strftime("%d/%m/%Y")
             with engine.begin() as conn:
                 conn.execute(text("UPDATE vision_clientes SET status = 'Em Dia', vencimento = :v WHERE nome = :n AND usuario_owner = :o"), {"v": prox_venc, "n": cli["nome"], "o": USUARIO_LOGADO})
                 conn.execute(text("INSERT INTO vision_historico (cliente, valor, data, usuario_owner) VALUES (:c, :v, :d, :o)"), {"c": cli["nome"], "v": cli["valor"], "d": agora_br.strftime("%d/%m/%Y %H:%M"), "o": USUARIO_LOGADO})
