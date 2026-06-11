@@ -10,7 +10,7 @@ from sqlalchemy.pool import NullPool
 # Configuração da página
 st.set_page_config(page_title="Vision Play TV", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
 
-# --- CSS PARA VISIBILIDADE 100% (ALTO CONTRASTE) E CORREÇÃO DE MENUS ---
+# --- CSS PARA TRANSPARÊNCIA 100% E CORREÇÃO CRÍTICA DE VISIBILIDADE DE TEXTOS ---
 st.markdown("""
     <style>
     /* Ocultar completamente o cabeçalho padrão, menu nativo, deploy e ícones do GitHub */
@@ -28,65 +28,91 @@ st.markdown("""
         padding-top: 2rem !important;
     }
 
-    /* Fundo Geral */
+    /* Fundo Geral do App */
     .stApp { background-color: #0b0f19 !important; }
     
-    /* Forçar todo o texto a ser branco ou visível */
-    h1, h2, h3, h4, p, div, label, span, .stMetric, .stMarkdown, .stTab { 
+    /* Forçar cores de textos e títulos específicos (evitando quebra de tabelas internas) */
+    h1, h2, h3, h4, p, label, .stMetric label { 
         color: #ffffff !important; 
     }
     
-    /* Botões - Forçar estilo visível */
-    button { 
-        background-color: #3b82f6 !important; 
+    /* Botões - 100% Transparentes com Bordas Destacadas */
+    button, [data-testid="stBaseButton-secondary"], [data-testid="stBaseButton-formSubmit"] { 
+        background-color: transparent !important; 
         color: #ffffff !important; 
         font-weight: bold !important;
-        border: 1px solid #60a5fa !important;
+        border: 2px solid #3b82f6 !important;
+        border-radius: 8px !important;
+        transition: background-color 0.3s ease, border-color 0.3s ease;
+    }
+    button:hover {
+        background-color: rgba(59, 130, 246, 0.2) !important;
+        border-color: #60a5fa !important;
     }
     
-    /* Inputs e Caixas de Texto (Visão Normal) */
+    /* Inputs e Caixas de Texto 100% Transparentes */
     .stTextInput input, .stSelectbox div[data-baseweb="select"], .stNumberInput input { 
-        background-color: #1e293b !important; 
+        background-color: transparent !important; 
         color: #ffffff !important; 
-        border: 1px solid #475569 !important; 
+        border: 1px solid #3b82f6 !important; 
+        border-radius: 8px !important;
     }
     
-    /* ==================================================== */
-    /* FUNDO DO MENU (POPOVER)                              */
-    /* ==================================================== */
+    /* Formulários 100% Transparentes */
+    div[data-testid="stForm"] {
+        background-color: transparent !important;
+        border: 2px solid #3b82f6 !important;
+        border-radius: 12px !important;
+    }
+    
+    /* Menu Popover Principal 100% Transparente */
     div[data-testid="stPopoverBody"] {
-        background-color: #1e293b !important;
-        border: 1px solid #475569 !important;
+        background-color: rgba(11, 15, 25, 0.95) !important;
+        border: 2px solid #3b82f6 !important;
         border-radius: 10px !important;
+        backdrop-filter: blur(10px);
     }
     
-    /* ==================================================== */
-    /* FUNDO DOS DROPDOWNS (SELECTBOX CLIENTES)             */
-    /* ==================================================== */
+    /* Dropdowns de Opções (Selectbox e Menus de Seleção) */
     div[data-baseweb="popover"] > div, 
     ul[data-baseweb="menu"], 
     li[role="option"] {
         background-color: #1e293b !important;
         color: #ffffff !important;
     }
-    
-    /* Hover (efeito ao passar o mouse) nas opções do selectbox */
     li[role="option"]:hover {
         background-color: #3b82f6 !important;
     }
 
-    /* Métricas */
+    /* Métricas 100% Transparentes */
     [data-testid="stMetric"] { 
-        background-color: #1e293b !important; 
+        background-color: transparent !important; 
         padding: 15px !important; 
         border-radius: 10px !important; 
-        border: 1px solid #334155 !important; 
+        border: 2px solid #3b82f6 !important; 
     }
     
-    /* Abas */
-    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
-    .stTabs [data-baseweb="tab"] { background-color: #1e293b !important; color: #ffffff !important; }
-    .stTabs [aria-selected="true"] { background-color: #3b82f6 !important; color: #ffffff !important; }
+    /* Abas (Tabs) 100% Transparentes */
+    .stTabs [data-baseweb="tab-list"] { 
+        background-color: transparent !important; 
+        gap: 10px; 
+    }
+    .stTabs [data-baseweb="tab"] { 
+        background-color: transparent !important; 
+        color: #ffffff !important; 
+        border: 1px solid transparent !important;
+    }
+    .stTabs [aria-selected="true"] { 
+        background-color: rgba(59, 130, 246, 0.2) !important; 
+        color: #ffffff !important; 
+        border: 2px solid #3b82f6 !important;
+        border-radius: 6px !important;
+    }
+
+    /* Correção do Container de Tabelas Dataframe */
+    div[data-testid="stDataFrame"] {
+        background-color: transparent !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -181,7 +207,7 @@ if not st.session_state["logado"]:
     
     with st.form("form_login", clear_on_submit=True):
         st.markdown("<h2 style='text-align: center;'>🔒 Vision Play TV</h2>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align: center; color: #ffffff !important; font-size: 14px;'>Insira suas credenciais</p>", unsafe_allow_html=True)
+        st.markdown("<h4 style='text-align: center; color: #ffffff !important; font-size: 14px;'>Insira suas credenciais</h4>", unsafe_allow_html=True)
         
         user_input = st.text_input("Usuário:").strip().lower()
         pass_input = st.text_input("Senha:", type="password").strip()
@@ -330,7 +356,7 @@ receita_pendente = receita_prevista - receita_recebida
 if st.session_state["pagina_atual"] == "dashboard":
     st.title("📊 Dashboard Vision Play TV")
     
-    # CONTAINER DE MÉTRICAS
+    # CONTAINER DE MÉTRICAS TRANSPARENTES
     with st.container():
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("👥 Seus Clientes", total_clientes)
@@ -360,16 +386,16 @@ if st.session_state["pagina_atual"] == "dashboard":
 elif st.session_state["pagina_atual"] == "clientes":
     st.title("👥 Gerenciamento de Clientes")
     
-    # FUNÇÃO OCULTA DE EXIBIÇÃO DE STATUS COM CORES DE ALTO CONTRASTE 100%
+    # EXIBIÇÃO DE STATUS COM CORES AJUSTADAS PARA ALTO CONTRASTE E TRANSPARÊNCIA
     st.subheader("📋 Status Geral de Pagamentos")
     if clientes:
         df_status = pd.DataFrame(clientes)[["nome", "status", "vencimento"]]
         df_status.columns = ["Nome do Cliente", "Status Atual", "Vencimento"]
         
         def aplicar_cores_status(row):
-            # Cores vivas para visibilidade em 100% no tema dark
-            cor_pago = "background-color: #10b981 !important; color: #ffffff !important; font-weight: bold !important;"
-            cor_pendente = "background-color: #ef4444 !important; color: #ffffff !important; font-weight: bold !important;"
+            # Fundos semitransparentes com bordas/textos brilhantes para manter a legibilidade e estética transparente
+            cor_pago = "background-color: rgba(16, 185, 129, 0.2) !important; color: #10b981 !important; font-weight: bold !important;"
+            cor_pendente = "background-color: rgba(239, 68, 68, 0.2) !important; color: #ef4444 !important; font-weight: bold !important;"
             
             estilo = cor_pago if row["Status Atual"] in ["Recebido", "Em Dia"] else cor_pendente
             return [estilo] * len(row)
@@ -380,7 +406,7 @@ elif st.session_state["pagina_atual"] == "clientes":
 
     st.divider()
 
-    # AS CONFIGURAÇÕES APARECEM AQUI (APÓS CLICAR NO MENU, NO LUGAR DO DASHBOARD)
+    # CONFIGURAÇÕES DA TELA (COMPLETAMENTE TRANSPARENTES)
     st.subheader("⚙️ Gerenciamento do Sistema")
     abas_disponiveis = ["💵 Registrar Pagamento", "➕ Novo Cliente", "✏️ Editar / Excluir"]
     if ROLE_LOGADO == "ADM": abas_disponiveis.append("👤 Painel ADM (Contas)")
