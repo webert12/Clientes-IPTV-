@@ -39,8 +39,8 @@ st.markdown("""
     /* Fundo Geral do App */
     .stApp { background-color: #0b0f19 !important; }
     
-    /* Forçar cores de textos e títulos específicos */
-    h1, h2, h3, h4, p, label, .stMetric label { 
+    /* CORREÇÃO CRÍTICA DE CORES DE TEXTOS, RÓTULOS E LABELS DO STREAMLIT */
+    h1, h2, h3, h4, p, label, .stMetric label, [data-testid="stWidgetLabel"] p { 
         color: #ffffff !important; 
     }
     
@@ -58,12 +58,13 @@ st.markdown("""
         border-color: #60a5fa !important;
     }
     
-    /* CORREÇÃO CRÍTICA DE VISIBILIDADE DOS INPUTS */
-    input, textarea, [data-baseweb="select"] {
+    /* CORREÇÃO BULLETPROOF DE VISIBILIDADE DOS INPUTS (TEXTO DIGITADO) */
+    input, textarea, [data-baseweb="select"], [data-baseweb="input"], [data-baseweb="base-input"] {
         background-color: #131a2c !important;
         color: #ffffff !important;
         -webkit-text-fill-color: #ffffff !important;
     }
+    
     .stTextInput input, .stSelectbox div[data-baseweb="select"], .stNumberInput input, .stTextArea textarea { 
         background-color: #131a2c !important; 
         color: #ffffff !important; 
@@ -71,12 +72,25 @@ st.markdown("""
         border: 1px solid #3b82f6 !important; 
         border-radius: 8px !important;
     }
+
+    /* Forçar cor branca mesmo se o navegador usar preenchimento automático (Autofill) */
+    input:-webkit-autofill,
+    input:-webkit-autofill:hover, 
+    input:-webkit-autofill:focus,
+    textarea:-webkit-autofill,
+    textarea:-webkit-autofill:hover,
+    textarea:-webkit-autofill:focus {
+        -webkit-text-fill-color: #ffffff !important;
+        -webkit-box-shadow: 0 0 0px 1000px #131a2c inset !important;
+        transition: background-color 5000s ease-in-out 0s;
+    }
     
-    /* Formulários 100% Transparentes */
+    /* Formulários com leve fundo para contraste ideal */
     div[data-testid="stForm"] {
-        background-color: transparent !important;
+        background-color: rgba(19, 26, 44, 0.3) !important;
         border: 2px solid #3b82f6 !important;
         border-radius: 12px !important;
+        padding: 20px !important;
     }
     
     /* CORREÇÃO DO POPOVER (MENU) */
@@ -216,7 +230,6 @@ if "logado" not in st.session_state:
     st.session_state["usuario_nome"] = ""
     st.session_state["usuario_role"] = ""
 
-# SE NÃO ESTIVER LOGADO, MOSTRA SÓ O LOGIN
 if not st.session_state["logado"]:
     st.markdown("""
         <style>
@@ -274,7 +287,6 @@ if not st.session_state["logado"]:
 # ==============================================================================
 # ÁREA DO DASHBOARD
 # ==============================================================================
-
 USUARIO_LOGADO = st.session_state["usuario_nome"]
 ROLE_LOGADO = st.session_state["usuario_role"]
 
@@ -368,7 +380,6 @@ receita_pendente = receita_prevista - receita_recebida
 # ==============================================================================
 # RENDERIZAÇÃO CONDICIONAL DE TELAS
 # ==============================================================================
-
 if st.session_state["pagina_atual"] == "dashboard":
     st.title("📊 Dashboard Vision Play TV")
     
@@ -457,11 +468,9 @@ elif st.session_state["pagina_atual"] == "clientes":
                         st.rerun()
                     except: st.error("Erro: Um cliente com esse nome já existe.")
 
-    # --- ABA: CADASTRO EM MASSA ---
     with abas[2]:
         st.markdown("### 🚀 Importar Lista de Clientes em Massa")
         st.markdown("Cole os seus clientes abaixo seguindo o formato padrão: `Nome, WhatsApp` (um cliente por linha).")
-        st.caption("Exemplo de formato válido:\nJoão da Silva, 5511999999999\nMaria de Souza, 5521988888888")
         
         col_m1, col_m2 = st.columns(2)
         with col_m1:
@@ -483,7 +492,6 @@ elif st.session_state["pagina_atual"] == "clientes":
                     for linha in linhas:
                         if not linha.strip():
                             continue
-                        
                         if "," in linha:
                             partes = linha.split(",", 1)
                             nome_c = partes[0].strip()
@@ -502,24 +510,16 @@ elif st.session_state["pagina_atual"] == "clientes":
                                     INSERT INTO vision_clientes (nome, whatsapp, vencimento, status, valor, telas, usuario_owner) 
                                     VALUES (:n, :w, :v, :s, :val, :t, :owner)
                                 """), {
-                                    "n": nome_c, 
-                                    "w": whats_c, 
-                                    "v": m_venc.strip(), 
-                                    "s": m_status, 
-                                    "val": m_valor, 
-                                    "t": int(m_telas), 
-                                    "owner": USUARIO_LOGADO
+                                    "n": nome_c, "w": whats_c, "v": m_venc.strip(), "s": m_status, "val": m_valor, "t": int(m_telas), "owner": USUARIO_LOGADO
                                 })
                                 sucessos += 1
                             except:
                                 falhas += 1
                                 
-                st.success(f"🔥 Importação finalizada! {sucessos} clientes foram adicionados com sucesso.")
+                st.success(f"🔥 Importação finalizada! {sucessos} clientes adicionados.")
                 if falhas > 0:
-                    st.warning(f"⚠️ {falhas} registros foram pulados (nomes repetidos ou inválidos).")
+                    st.warning(f"⚠️ {falhas} registros pulados (nomes repetidos).")
                 st.rerun()
-            else:
-                st.error("Por favor, preencha a caixa de texto antes de salvar.")
 
     with abas[3]:
         if clientes:
@@ -541,7 +541,6 @@ elif st.session_state["pagina_atual"] == "clientes":
                         conn.execute(text("DELETE FROM vision_clientes WHERE nome=:n AND TRIM(LOWER(usuario_owner))=:owner"), {"n": cli_ed["nome"], "owner": USUARIO_LOGADO})
                     st.rerun()
 
-    # --- EDICÃO E EXCLUSÃO DE REVENDEDORES (PAINEL ADM) ---
     if ROLE_LOGADO == "ADM":
         with abas[4]:
             st.subheader("Gerenciar Revendedores/Usuários")
@@ -553,7 +552,7 @@ elif st.session_state["pagina_atual"] == "clientes":
                     u_nome = st.text_input("Login:").strip().lower()
                     u_pass = st.text_input("Senha:").strip()
                     u_role = st.selectbox("Nível:", ["USER", "ADM"])
-                    u_dias = st.number_input("Dias de Vencimento (Conta):", min_value=1, value=30)
+                    u_dias = st.number_input("Dias de Vencimento:", min_value=1, value=30)
                     if st.form_submit_button("Criar Conta"):
                         venc = (hoje + timedelta(days=u_dias)).strftime("%d/%m/%Y")
                         try:
@@ -577,32 +576,26 @@ elif st.session_state["pagina_atual"] == "clientes":
                         e_u_pass = st.text_input("Senha Atual/Nova:", value=usr_ed["password"])
                         e_u_role = st.selectbox("Nível:", ["USER", "ADM"], index=["USER", "ADM"].index(usr_ed["role"]) if usr_ed["role"] in ["USER", "ADM"] else 0)
                         e_u_status = st.selectbox("Status:", ["Ativo", "Bloqueado"], index=["Ativo", "Bloqueado"].index(usr_ed["status"]) if usr_ed["status"] in ["Ativo", "Bloqueado"] else 0)
-                        e_u_venc = st.text_input("Vencimento (dd/mm/aaaa):", value=usr_ed["vencimento_usuario"])
+                        e_u_venc = st.text_input("Vencimento:", value=usr_ed["vencimento_usuario"])
                         
                         c_ubtn1, c_ubtn2 = st.columns(2)
                         if c_ubtn1.form_submit_button("💾 Salvar Alterações"):
                             with engine.begin() as conn:
-                                conn.execute(text("""
-                                    UPDATE vision_usuarios 
-                                    SET password = :p, role = :r, status = :s, vencimento_usuario = :v 
-                                    WHERE username = :u
-                                """), {"p": e_u_pass, "r": e_u_role, "s": e_u_status, "v": e_u_venc, "u": sel_usr_nome})
-                            st.success("Usuário updated!")
+                                conn.execute(text("UPDATE vision_usuarios SET password=:p, role=:r, status=:s, vencimento_usuario=:v WHERE username=:u"), {"p": e_u_pass, "r": e_u_role, "s": e_u_status, "v": e_u_venc, "u": sel_usr_nome})
+                            st.success("Usuário atualizado!")
                             st.rerun()
                             
                         if c_ubtn2.form_submit_button("🚨 Deletar Conta"):
                             if sel_usr_nome == USUARIO_LOGADO:
-                                st.error("Você não pode deletar a sua própria conta em uso!")
+                                st.error("Você não pode deletar a sua própria conta!")
                             else:
                                 with engine.begin() as conn:
                                     conn.execute(text("DELETE FROM vision_usuarios WHERE username = :u"), {"u": sel_usr_nome})
-                                st.success(f"Conta '{sel_usr_nome}' removida!")
+                                st.success("Conta removida!")
                                 st.rerun()
-                else:
-                    st.info("Nenhum usuário cadastrado para edição.")
+                else: st.info("Nenhum usuário cadastrado.")
             
             st.divider()
             st.markdown("### 📋 Lista Geral de Contas Cadastradas")
             if lista_usuarios:
-                df_users = pd.DataFrame(lista_usuarios)
-                st.dataframe(df_users, hide_index=True, use_container_width=True)
+                st.dataframe(pd.DataFrame(lista_usuarios), hide_index=True, use_container_width=True)
