@@ -7,34 +7,61 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
 
-# Configuração da página - Forçando o fechamento de qualquer barra lateral nativa
+# Configuração da página - Iniciando oculta para usar o novo posicionamento do botão
 st.set_page_config(page_title="Vision Play TV", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
 
 # --- CSS DEFINITIVO E BLINDADO PARA VISIBILIDADE 100% ---
 st.markdown("""
     <style>
-    /* 1. ELIMINAR COMPLETAMENTE MENUS, SETAS (>>), BARRAS LATERAIS E CABEÇALHOS NATIVOS */
-    [data-testid="stSidebar"], 
-    [data-testid="stSidebarCollapseButton"], 
-    [data-testid="stHeader"], 
-    .stAppHeader, 
-    header, 
-    button[aria-label="Expand sidebar"] {
+    /* 1. DELETAR CABEÇALHO INTEIRO, ÍCONES NATIVOS E QUALQUER COISA DO GITHUB */
+    header, [data-testid="stHeader"], .stAppHeader {
+        background-color: transparent !important;
+        background: transparent !important;
+    }
+    /* Ocultar os botões do canto superior direito (Deploy, GitHub, Menu de 3 pontos) */
+    button[aria-label="User Menu"], 
+    .stAppDeployButton, 
+    [data-testid="stActionButton"],
+    header button,
+    header a {
         display: none !important;
         visibility: hidden !important;
     }
     
-    /* 2. FUNDO DO APLICATIVO */
+    /* 2. REPOSICIONAR O BOTÃO DE SETAS (>> / ABRIR SIDEBAR) PERTO DO TÍTULO DASHBOARD */
+    [data-testid="stSidebarCollapseButton"] {
+        display: flex !important;
+        visibility: visible !important;
+        position: absolute !important;
+        top: 42px !important; /* Move o botão para baixo na linha do título */
+        left: 25px !important; /* Posiciona logo antes do início do conteúdo */
+        z-index: 999999 !important;
+        background-color: #2563eb !important;
+        color: #ffffff !important;
+        border: 2px solid #ffffff !important;
+        border-radius: 6px !important;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.5) !important;
+    }
+    [data-testid="stSidebarCollapseButton"] svg {
+        fill: #ffffff !important;
+        color: #ffffff !important;
+    }
+    
+    /* 3. FUNDO DO APLICATIVO */
     .stApp { background-color: #0b0f19 !important; }
     
-    /* 3. TÍTULOS E TEXTOS COM CONTRASTE MÁXIMO BRANCO */
+    /* 4. TÍTULOS E TEXTOS COM CONTRASTE MÁXIMO BRANCO */
     h1, h2, h3, h4, h5, h6 { color: #ffffff !important; font-weight: 800 !important; }
     p, span, label, .stMarkdown, [data-testid="stWidgetLabel"] p { color: #f1f5f9 !important; font-size: 16px !important; font-weight: 600 !important; }
     
-    # .stWidgetLabel { color: #ffffff !important; }
+    /* Embelezamento e fixação de cor da própria Sidebar quando aberta */
+    [data-testid="stSidebar"] {
+        background-color: #0f172a !important;
+        border-right: 2px solid #334155 !important;
+    }
 
-    /* 4. BOTÕES COM VISIBILIDADE TOTAL (AZUL ELÉTRICO, BORDA REFORÇADA E TEXTO BRANCO) */
-    button, .stButton > button { 
+    /* 5. BOTÕES COM VISIBILIDADE TOTAL (AZUL ELÉTRICO, BORDA REFORÇADA E TEXTO BRANCO) */
+    .stButton > button { 
         background-color: #2563eb !important; 
         color: #ffffff !important; 
         font-weight: bold !important;
@@ -43,13 +70,13 @@ st.markdown("""
         padding: 0.6rem 1.2rem !important;
         box-shadow: 0 4px 6px rgba(0,0,0,0.4) !important;
     }
-    button:hover, .stButton > button:hover {
+    .stButton > button:hover {
         background-color: #1d4ed8 !important;
         border-color: #60a5fa !important;
         color: #ffffff !important;
     }
     
-    /* 5. CAIXAS DE ENTRADA DE TEXTO E SELEÇÃO CORRIGIDAS */
+    /* 6. CAIXAS DE ENTRADA DE TEXTO E SELEÇÃO CORRIGIDAS */
     input, select, textarea, div[data-baseweb="select"] {
         background-color: #1e293b !important;
         color: #ffffff !important;
@@ -67,7 +94,7 @@ st.markdown("""
     div[data-baseweb="popover"] ul, div[role="listbox"] { background-color: #1e293b !important; }
     div[role="listbox"] li, [data-baseweb="select"] li { color: #ffffff !important; background-color: #1e293b !important; }
     
-    /* 6. BLOCOS DE MÉTRICAS */
+    /* 7. BLOCOS DE MÉTRICAS */
     [data-testid="stMetric"] { 
         background-color: #1e293b !important; 
         padding: 18px !important; 
@@ -77,7 +104,7 @@ st.markdown("""
     [data-testid="stMetricValue"] > div { color: #38bdf8 !important; font-weight: 800 !important; font-size: 26px !important; }
     [data-testid="stMetricLabel"] > div { color: #cbd5e1 !important; font-weight: bold !important; }
     
-    /* 7. ABAS DE GERENCIAMENTO */
+    /* 8. ABAS DE GERENCIAMENTO */
     .stTabs [data-baseweb="tab-list"] { gap: 8px; }
     .stTabs [data-baseweb="tab"] { 
         background-color: #1e293b !important; 
@@ -248,7 +275,10 @@ with st.popover("Menu do Sistema"):
         st.session_state.clear()
         st.rerun()
 
-st.title("📊 Dashboard Vision Play TV")
+# Espaçamento manual à esquerda para o título não sobrepor o botão movido pelo CSS
+st.markdown("""
+    <h1 style='padding-left: 55px; margin-bottom: 20px;'>📊 Dashboard Vision Play TV</h1>
+""", unsafe_allow_html=True)
 
 def carregar_dados_privados(dono_da_conta):
     with engine.connect() as conn:
