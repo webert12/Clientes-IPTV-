@@ -45,7 +45,7 @@ st.markdown("""
     h1, h2, h3, h4, h5, h6 { color: #ffffff !important; font-weight: 800 !important; }
     p, span, label, .stMarkdown, [data-testid="stWidgetLabel"] p { color: #f1f5f9 !important; font-size: 16px !important; font-weight: 600 !important; }
     
-    /* 5. CORREÇÃO COMPLETA DAS CAIXAS DE SELEÇÃO (SELECTBOX / DROPDOWN TEXTO INVISÍVEL) */
+    /* 5. CORREÇÃO COMPLETA DAS CAIXAS DE SELEÇÃO (SELECTBOX / DROPDOWN TEXTO INVISÍVEL AO BUSCAR) */
     div[data-baseweb="select"] > div {
         background-color: #1e293b !important;
         color: #ffffff !important;
@@ -54,18 +54,24 @@ st.markdown("""
     div[data-baseweb="select"] span, div[data-baseweb="select"] div {
         color: #ffffff !important;
     }
+    /* Forçar visibilidade do texto digitado na busca de clientes */
+    div[data-baseweb="select"] input {
+        color: #ffffff !important;
+        -webkit-text-fill-color: #ffffff !important;
+    }
     
-    /* Opções internas do menu suspenso ao clicar no celular */
-    div[data-baseweb="popover"] div[role="listbox"], div[role="listbox"], [data-baseweb="menu"] {
+    /* Opções internas do menu suspenso ao clicar no celular e desktop */
+    div[data-baseweb="popover"] div[role="listbox"], div[role="listbox"], [data-baseweb="menu"], [role="option"], li[role="option"] {
         background-color: #1e293b !important;
         color: #ffffff !important;
     }
-    div[role="listbox"] li, [data-baseweb="select"] li {
+    div[role="listbox"] li, [data-baseweb="select"] li, [role="option"] * {
         background-color: #1e293b !important;
         color: #ffffff !important;
     }
-    div[role="listbox"] li:hover, [data-baseweb="select"] li:hover {
+    div[role="listbox"] li:hover, [data-baseweb="select"] li:hover, li[role="option"]:hover {
         background-color: #334155 !important;
+        color: #ffffff !important;
     }
 
     /* 6. CORREÇÃO DOS TEXTOS DO POPOVER (MENU DO SISTEMA CORES) */
@@ -79,11 +85,11 @@ st.markdown("""
     div[data-testid="stPopover"] button p {
         color: #ffffff !important;
     }
-    div[data-baseweb="popover"] {
+    div[data-baseweb="popover"], [data-testid="stPopoverBody"] {
         background-color: #1e293b !important;
         border: 2px solid #475569 !important;
     }
-    div[data-baseweb="popover"] * {
+    div[data-baseweb="popover"] *, [data-testid="stPopoverBody"] * {
         color: #ffffff !important;
     }
 
@@ -309,7 +315,8 @@ with col1:
         df_cli = df_cli[df_cli["Qtd"] > 0]
         fig_cli = px.pie(df_cli, names="Status", values="Qtd", title="Situação dos Clientes",
                          color="Status", color_discrete_map={"Em Dia": "#10b981", "Vencendo": "#f59e0b", "Vencidos": "#ef4444"})
-        fig_cli.update_traces(textposition='inside', textinfo='percent+label')
+        # Forçado o textfont com cor fixa branca para total legibilidade das porcentagens na pizza
+        fig_cli.update_traces(textposition='inside', textinfo='percent+label', textfont=dict(color='#ffffff', size=14))
         fig_cli.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='#ffffff', title_font_color='#ffffff', legend_font_color='#ffffff')
         st.plotly_chart(fig_cli, use_container_width=True, config={'displayModeBar': False})
     else: st.info("Nenhum cliente para gerar gráfico.")
@@ -320,7 +327,8 @@ with col2:
         df_fin = df_fin[df_fin["Valor"] > 0]
         fig_fin = px.pie(df_fin, names="Tipo", values="Valor", title="Divisão Financeira",
                          color="Tipo", color_discrete_map={"Recebido": "#10b981", "Pendente": "#ef4444"})
-        fig_fin.update_traces(textposition='inside', textinfo='percent+label')
+        # Forçado o textfont com cor fixa branca para total legibilidade das porcentagens na pizza
+        fig_fin.update_traces(textposition='inside', textinfo='percent+label', textfont=dict(color='#ffffff', size=14))
         fig_fin.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='#ffffff', title_font_color='#ffffff', legend_font_color='#ffffff')
         st.plotly_chart(fig_fin, use_container_width=True, config={'displayModeBar': False})
     else: st.info("Financeiro zerado.")
