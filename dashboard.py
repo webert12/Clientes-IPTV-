@@ -501,7 +501,7 @@ elif st.session_state["pagina_atual"] == "clientes":
                 falhas = 0
                 
                 with engine.begin() as conn:
-                    for linha in pandas:
+                    for linha in Pandas:
                         if not linha.strip():
                             continue
                         if "," in linha:
