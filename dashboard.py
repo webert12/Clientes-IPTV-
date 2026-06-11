@@ -134,6 +134,12 @@ st.markdown("""
         background-color: #0f172a !important;
         border-right: 2px solid #334155 !important;
     }
+
+    /* 11. GARANTIR VISIBILIDADE ABSOLUTA DE TEXTOS DENTRO DE TABELAS */
+    table, tr, td, th {
+        color: #ffffff !important;
+        font-size: 14px !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -235,27 +241,55 @@ if not st.session_state["logado"]:
 USUARIO_LOGADO = st.session_state["usuario_nome"]
 ROLE_LOGADO = st.session_state["usuario_role"]
 
-# --- CORREÇÃO 1: MENU EXTRAÍDO DO POPOVER E MOVIDO DIRETAMENTE PARA A BARRA LATERAL ---
+# --- LATERAL INFORMATIVA CORRIGIDA ---
 with st.sidebar:
     st.markdown("## 📋 Menu Vision Play")
     st.markdown(f"👤 **Usuário:** `{USUARIO_LOGADO}`")
     st.markdown(f"🎖️ **Nível:** `{ROLE_LOGADO}`")
     st.divider()
-    if ROLE_LOGADO == "ADM":
-        if st.button("🔄 Sincronizar Banco", use_container_width=True):
-            st.rerun()
-    if st.button("🚪 Sair do Sistema", use_container_width=True):
+    if st.button("🚪 Desconectar", use_container_width=True):
         st.session_state.clear()
         st.rerun()
 
-# Margem para o título não encavalar no botão gerenciar movido pelo CSS
-st.markdown("<h1 style='padding-left: 55px; margin-top: -10px;'>📊 Dashboard Vision Play TV</h1>", unsafe_allow_html=True)
+# --- HEADER COM O TÍTULO E RETORNO DO BOTÃO DE CONFIGURAÇÕES (POPOVER) ---
+col_titulo, col_menu = st.columns([3, 1])
+with col_titulo:
+    st.markdown("<h1 style='padding-left: 55px; margin-top: -10px;'>📊 Dashboard Vision Play TV</h1>", unsafe_allow_html=True)
+
+with col_menu:
+    # Retorno do Botão de Menu com as Configurações originais via Popover solicitado
+    with st.popover("⚙️ Configurações", use_container_width=True):
+        st.markdown("<h4 style='margin:0; padding:0;'>Ajustes Globais</h4>", unsafe_allow_html=True)
+        st.divider()
+        if ROLE_LOGADO == "ADM":
+            if st.button("🔄 Sincronizar Banco", use_container_width=True, key="pop_sync"):
+                st.rerun()
+        if st.button("🚪 Sair do Sistema", use_container_width=True, key="pop_sair"):
+            st.session_state.clear()
+            st.rerun()
 
 def carregar_dados_privados(dono_da_conta):
     with engine.connect() as conn:
-        res_clientes = conn.execute(text("SELECT nome, whatsapp, vencimento, status, valor, telas FROM vision_clientes WHERE TRIM(LOWER(COALESCE(usuario_owner, 'admin'))) = TRIM(LOWER(:u)) ORDER BY nome"), {"u": dono_da_conta}).fetchall()
-        res_historico = conn.execute(text("SELECT cliente, valor, data FROM vision_historico WHERE TRIM(LOWER(COALESCE(usuario_owner, 'admin'))) = TRIM(LOWER(:u)) ORDER BY id ASC"), {"u": dono_da_conta}).fetchall()
-        return [{"nome": r[0], "whatsapp": r[1], "vencimento": r[2], "status": r[3], "valor": float(r[4] or 0), "telas": int(r[5] or 1)} for r in res_clientes], [{"cliente": r[0], "valor": float(r[1] or 0), "data": r[2]} for r in res_historico]
+        # Uso do .mappings() para blindagem total contra nomes invisíveis ou desalinhados
+        res_clientes = conn.execute(text("SELECT nome, whatsapp, vencimento, status, valor, telas FROM vision_clientes WHERE TRIM(LOWER(COALESCE(usuario_owner, 'admin'))) = TRIM(LOWER(:u)) ORDER BY nome"), {"u": dono_da_conta}).mappings().fetchall()
+        res_historico = conn.execute(text("SELECT cliente, valor, data FROM vision_historico WHERE TRIM(LOWER(COALESCE(usuario_owner, 'admin'))) = TRIM(LOWER(:u)) ORDER BY id ASC"), {"u": dono_da_conta}).mappings().fetchall()
+        
+        return [
+            {
+                "nome": r["nome"], 
+                "whatsapp": r["whatsapp"], 
+                "vencimento": r["vencimento"], 
+                "status": r["status"], 
+                "valor": float(r["valor"] or 0), 
+                "telas": int(r["telas"] or 1)
+            } for r in res_clientes
+        ], [
+            {
+                "cliente": r["cliente"], 
+                "valor": float(r["valor"] or 0), 
+                "data": r["data"]
+            } for r in res_historico
+        ]
 
 clientes, historico = carregar_dados_privados(USUARIO_LOGADO)
 
@@ -264,7 +298,7 @@ total_clientes = len(clientes)
 em_dia, vencendo, vencidos = 0, 0, 0
 receita_prevista, receita_recebida = 0, 0
 
-# Variáveis para cálculo financeiro preciso do gráfico de pizza solicitado
+# Variáveis para cálculo financeiro preciso do gráfico de pizza
 valor_pago = 0.0
 valor_vencido = 0.0
 valor_a_vencer = 0.0
@@ -273,12 +307,11 @@ for cl in clientes:
     receita_prevista += cl["valor"]
     status_limpo = str(cl["status"]).strip().lower()
     
-    # Separação por regras de status informados
     if status_limpo in ["em dia", "recebido", "pago"]:
         valor_pago += cl["valor"]
     elif status_limpo in ["vencido", "vencidos"]:
         valor_vencido += cl["valor"]
-    else: # vencendo / pendente
+    else:
         valor_a_vencer += cl["valor"]
 
     try:
@@ -301,7 +334,7 @@ with st.container():
 
 st.divider()
 
-# --- INTEGRANDO GRÁFICOS EM PIZZA TRANSPARENTES (TEMA ESCURO BLINDADO) ---
+# --- GRÁFICOS EM PIZZA TRANSPARENTES ---
 col1, col2 = st.columns(2)
 with col1:
     if total_clientes > 0:
@@ -314,7 +347,6 @@ with col1:
     else: st.info("Nenhum cliente para gerar gráfico.")
 
 with col2:
-    # --- CORREÇÃO 2: GRÁFICO FINANCEIRO EXIBINDO PAGO, VENCIDO E A VENCER ---
     if receita_prevista > 0:
         df_fin = pd.DataFrame({
             "Tipo": ["Pago", "Vencido", "A Vencer"], 
@@ -329,23 +361,31 @@ with col2:
 
 st.divider()
 
-# --- TABELA COMPACTA COM CORREÇÃO DAS CORES DINÂMICAS ---
+# --- TABELA COMPACTA COM CORREÇÃO E BLINDAGEM DE COR DOS NOMES ---
 st.subheader("📋 Lista de Clientes e Situação")
 with st.expander("👁️ Clique para Abrir / Esconder a Lista de Clientes", expanded=False):
     if clientes:
-        html_table = '<div style="overflow-x:auto; background-color: #111827; padding: 6px; border-radius: 8px; border: 2px solid #334155;"><table style="width:100%; border-collapse: collapse; text-align: left;"><thead><tr style="background-color: #1e293b; border-bottom: 2px solid #64748b;"><th style="padding: 6px; color: #ffffff !important; font-size: 14px;">Nome</th><th style="padding: 6px; color: #ffffff !important; font-size: 14px;">WhatsApp</th><th style="padding: 6px; color: #ffffff !important; font-size: 14px;">Vencimento</th><th style="padding: 6px; color: #ffffff !important; font-size: 14px;">Status</th><th style="padding: 6px; color: #ffffff !important; font-size: 14px;">Valor</th><th style="padding: 6px; color: #ffffff !important; font-size: 14px;">Telas</th></tr></thead><tbody>'
+        html_table = '<div style="overflow-x:auto; background-color: #111827; padding: 6px; border-radius: 8px; border: 2px solid #334155;"><table style="width:100%; border-collapse: collapse; text-align: left;"><thead><tr style="background-color: #1e293b; border-bottom: 2px solid #64748b;"><th style="padding: 8px; color: #ffffff !important; font-size: 14px; font-weight: bold;">Nome</th><th style="padding: 8px; color: #ffffff !important; font-size: 14px; font-weight: bold;">WhatsApp</th><th style="padding: 8px; color: #ffffff !important; font-size: 14px; font-weight: bold;">Vencimento</th><th style="padding: 8px; color: #ffffff !important; font-size: 14px; font-weight: bold;">Status</th><th style="padding: 8px; color: #ffffff !important; font-size: 14px; font-weight: bold;">Valor</th><th style="padding: 8px; color: #ffffff !important; font-size: 14px; font-weight: bold;">Telas</th></tr></thead><tbody>'
         for c in clientes:
             status_limpo = str(c["status"]).strip().lower()
             
-            # --- CORREÇÃO 3: SEPARAÇÃO REAL DE CORES (VERDE, VERMELHO E AMARELO INDEPENDENTES) ---
             if status_limpo in ["em dia", "recebido", "pago"]:
-                bg = "#065f46"  # Verde escuro nítido para pagantes
+                bg = "#065f46"  
             elif status_limpo in ["vencido", "vencidos"]:
-                bg = "#991b1b"  # Vermelho fechado para vencidos
+                bg = "#991b1b"  
             else:
-                bg = "#854d0e"  # Amarelo/Ouro escuro para pendentes / vencendo
+                bg = "#854d0e"  
                 
-            html_table += f'<tr style="background-color: {bg}; border-bottom: 1px solid #475569;"><td style="padding: 6px; color: #ffffff !important; font-weight: bold; font-size: 13px;">{c["nome"]}</td><td style="padding: 6px; color: #ffffff !important; font-size: 13px;">{c["whatsapp"]}</td><td style="padding: 6px; color: #ffffff !important; font-size: 13px;">{c["vencimento"]}</td><td style="padding: 6px; color: #ffffff !important; font-size: 13px;">{c["status"]}</td><td style="padding: 6px; color: #ffffff !important; font-size: 13px;">R$ {c["valor"]:.2f}</td><td style="padding: 6px; color: #ffffff !important; font-size: 13px;">{c["telas"]}</td></tr>'
+            # Estilo inline "color: #ffffff !important" reforçado em cada célula para máxima nitidez
+            html_table += f'<tr style="background-color: {bg}; border-bottom: 1px solid #475569;">'
+            html_table += f'<td style="padding: 8px; color: #ffffff !important; font-weight: bold; font-size: 14px;">{c["nome"]}</td>'
+            html_table += f'<td style="padding: 8px; color: #ffffff !important; font-size: 14px;">{c["whatsapp"]}</td>'
+            html_table += f'<td style="padding: 8px; color: #ffffff !important; font-size: 14px;">{c["vencimento"]}</td>'
+            html_table += f'<td style="padding: 8px; color: #ffffff !important; font-size: 14px;">{c["status"]}</td>'
+            html_table += f'<td style="padding: 8px; color: #ffffff !important; font-size: 14px;">R$ {c["valor"]:.2f}</td>'
+            html_table += f'<td style="padding: 8px; color: #ffffff !important; font-size: 14px;">{c["telas"]}</td>'
+            html_table += '</tr>'
+            
         html_table += "</tbody></table></div>"
         st.markdown(html_table, unsafe_allow_html=True)
     else: st.info("Nenhum cliente cadastrado.")
@@ -437,7 +477,7 @@ if ROLE_LOGADO == "ADM":
 
 st.divider()
 
-# --- HISTÓRICO RECOLHIDO EM OUTRO EXPANDER ---
+# --- HISTÓRICO RECOLHIDO ---
 st.subheader("💵 Seus Últimos Recebimentos")
 with st.expander("👁️ Clique para Abrir / Esconder o Histórico de Recebimentos", expanded=False):
     if historico:
