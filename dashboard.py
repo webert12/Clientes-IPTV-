@@ -13,6 +13,14 @@ st.set_page_config(page_title="Vision Play TV", page_icon="📊", layout="wide",
 # --- CSS PARA TRANSPARÊNCIA 100% E CORREÇÃO CRÍTICA DE VISIBILIDADE ---
 st.markdown("""
     <style>
+    /* VARIÁVEIS DE TEMA NATIVAS - Força componentes internos (Canvas/Dataframe) a entrarem em Modo Escuro */
+    :root, .stApp {
+        --text-color: #ffffff !important;
+        --background-color: #0b0f19 !important;
+        --secondary-background-color: #131a2c !important;
+        --primary-color: #3b82f6 !important;
+    }
+
     /* Ocultar completamente o cabeçalho padrão, menu nativo, deploy e ícones do GitHub */
     .stAppHeader, [data-testid="stHeader"], [data-testid="stAppDeployButton"], #MainMenu { 
         display: none !important; 
@@ -117,10 +125,16 @@ st.markdown("""
         border-radius: 6px !important;
     }
 
-    /* CORREÇÃO CRÍTICA DA TABELA */
+    /* CORREÇÃO CRÍTICA DO DATAFRAME/TABELA (Fundo e Cor de Texto Forçados) */
     div[data-testid="stDataFrame"], 
     div[data-testid="stDataFrame"] > div {
-        background-color: transparent !important;
+        background-color: #131a2c !important;
+    }
+    div[data-testid="stDataFrame"] td, 
+    div[data-testid="stDataFrame"] th,
+    table td, 
+    table th {
+        color: #ffffff !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -443,7 +457,7 @@ elif st.session_state["pagina_atual"] == "clientes":
                         st.rerun()
                     except: st.error("Erro: Um cliente com esse nome já existe.")
 
-    # --- NOVA ABA: CADASTRO EM MASSA ---
+    # --- ABA: CADASTRO EM MASSA ---
     with abas[2]:
         st.markdown("### 🚀 Importar Lista de Clientes em Massa")
         st.markdown("Cole os seus clientes abaixo seguindo o formato padrão: `Nome, WhatsApp` (um cliente por linha).")
@@ -470,7 +484,6 @@ elif st.session_state["pagina_atual"] == "clientes":
                         if not linha.strip():
                             continue
                         
-                        # Tenta separar por vírgula ou ponto e vírgula
                         if "," in linha:
                             partes = linha.split(",", 1)
                             nome_c = partes[0].strip()
@@ -574,7 +587,7 @@ elif st.session_state["pagina_atual"] == "clientes":
                                     SET password = :p, role = :r, status = :s, vencimento_usuario = :v 
                                     WHERE username = :u
                                 """), {"p": e_u_pass, "r": e_u_role, "s": e_u_status, "v": e_u_venc, "u": sel_usr_nome})
-                            st.success("Usuário atualizado!")
+                            st.success("Usuário updated!")
                             st.rerun()
                             
                         if c_ubtn2.form_submit_button("🚨 Deletar Conta"):
