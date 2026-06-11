@@ -10,7 +10,7 @@ from sqlalchemy.pool import NullPool
 # Configuração da página
 st.set_page_config(page_title="Vision Play TV", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
 
-# --- CSS PARA VISIBILIDADE 100% (ALTO CONTRASTE) E REMOÇÃO DE CABEÇALHO NATIVO ---
+# --- CSS PARA VISIBILIDADE 100% (ALTO CONTRASTE) E CORREÇÃO DE MENUS ---
 st.markdown("""
     <style>
     /* Ocultar completamente o cabeçalho padrão, menu nativo, deploy e ícones do GitHub */
@@ -32,7 +32,7 @@ st.markdown("""
     .stApp { background-color: #0b0f19 !important; }
     
     /* Forçar todo o texto a ser branco ou visível */
-    h1, h2, h3, h4, p, div, label, span, .stMetric, .stMarkdown, .stTab, .stSelectbox, .stTextInput { 
+    h1, h2, h3, h4, p, div, label, span, .stMetric, .stMarkdown, .stTab { 
         color: #ffffff !important; 
     }
     
@@ -44,13 +44,37 @@ st.markdown("""
         border: 1px solid #60a5fa !important;
     }
     
-    /* Inputs e Caixas de Texto */
-    .stTextInput input, .stSelectbox div { 
+    /* Inputs e Caixas de Texto (Visão Normal) */
+    .stTextInput input, .stSelectbox div[data-baseweb="select"], .stNumberInput input { 
         background-color: #1e293b !important; 
         color: #ffffff !important; 
         border: 1px solid #475569 !important; 
     }
     
+    /* ==================================================== */
+    /* CORREÇÃO 1: FUNDO DO MENU (POPOVER)                  */
+    /* ==================================================== */
+    div[data-testid="stPopoverBody"] {
+        background-color: #1e293b !important;
+        border: 1px solid #475569 !important;
+        border-radius: 10px !important;
+    }
+    
+    /* ==================================================== */
+    /* CORREÇÃO 2: FUNDO DOS DROPDOWNS (SELECTBOX CLIENTES) */
+    /* ==================================================== */
+    div[data-baseweb="popover"] > div, 
+    ul[data-baseweb="menu"], 
+    li[role="option"] {
+        background-color: #1e293b !important;
+        color: #ffffff !important;
+    }
+    
+    /* Hover (efeito ao passar o mouse) nas opções do selectbox */
+    li[role="option"]:hover {
+        background-color: #3b82f6 !important;
+    }
+
     /* Métricas */
     [data-testid="stMetric"] { 
         background-color: #1e293b !important; 
