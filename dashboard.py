@@ -256,13 +256,12 @@ with st.sidebar:
         st.session_state.clear()
         st.rerun()
 
-# --- BLOCCO SUPERIOR COM TÍTULO E BOTÃO POPOVER RESTAURADO ---
+# --- BLOCO SUPERIOR COM TÍTULO E BOTÃO POPOVER ---
 col_titulo, col_menu = st.columns([3, 1])
 with col_titulo:
     st.markdown("<h1 style='padding-left: 55px; margin-top: -10px;'>📊 Dashboard Vision Play TV</h1>", unsafe_allow_html=True)
 
 with col_menu:
-    # Retorno completo do botão de menu Popover com as configurações solicitadas
     with st.popover("⚙️ Configurações", use_container_width=True):
         st.markdown("<h4>🔧 Opções do Sistema</h4>", unsafe_allow_html=True)
         st.divider()
@@ -295,14 +294,13 @@ for cl in clientes:
     receita_prevista += cl["valor"]
     status_limpo = str(cl["status"]).strip().lower()
     
-    # Sincronização direta dos valores com base no que está salvo e acontecendo no banco
     if status_limpo in ["em dia", "recebido", "pago"]:
         valor_pago += cl["valor"]
         em_dia += 1
     elif status_limpo in ["vencido", "vencidos"]:
         valor_vencido += cl["valor"]
         vencidos += 1
-    else: # pendente / vencendo / vendendo
+    else:
         valor_a_vencer += cl["valor"]
         vencendo += 1
 
@@ -318,7 +316,7 @@ with st.container():
 
 st.divider()
 
-# --- INTEGRANDO GRÁFICOS EM PIZZA TRANSPARENTES (MUDANÇA EM TEMPO REAL) ---
+# --- INTEGRANDO GRÁFICOS EM PIZZA TRANSPARENTES ---
 col1, col2 = st.columns(2)
 with col1:
     if total_clientes > 0:
@@ -345,21 +343,33 @@ with col2:
 
 st.divider()
 
-# --- TABELA COMPACTA COM SEPARAÇÃO INDEPENDENTE DE CORES ---
+# --- TABELA COMPACTA COM SEPARAÇÃO INDEPENDENTE DE CORES (PROTEÇÃO COM ASPAS TRIPLAS) ---
 st.subheader("📋 Lista de Clientes e Situação")
 with st.expander("👁️ Clique para Abrir / Esconder a Lista de Clientes", expanded=False):
     if clientes:
-        html_table = '<div style="overflow-x:auto; background-color: #111827; padding: 6px; border-radius: 8px; border: 2px solid #334155;"><table style="width:100%; border-collapse: collapse; text-align: left;"><thead><tr style="background-color: #1e293b; border-bottom: 2px solid #64748b;"><th style="padding: 6px; color: #ffffff !important; font-size: 14px;">Nome</th><th style="padding: 6px; color: #ffffff !important; font-size: 14px;">WhatsApp</th><th style="padding: 6px; color: #ffffff !important; font-size: 14px;">Vencimento</th><th style="padding: 6px; color: #ffffff !important; font-size: 14px;">Status</th><th style="padding: 6px; color: #ffffff !important; font-size: 14px;">Valor</th><th style="padding: 6px; color: #ffffff !important; font-size: 14px;">Telas</th></tr></thead><tbody>'
+        html_table = """<div style="overflow-x:auto; background-color: #111827; padding: 6px; border-radius: 8px; border: 2px solid #334155;">
+        <table style="width:100%; border-collapse: collapse; text-align: left;">
+        <thead>
+        <tr style="background-color: #1e293b; border-bottom: 2px solid #64748b;">
+        <th style="padding: 6px; color: #ffffff !important; font-size: 14px;">Nome</th>
+        <th style="padding: 6px; color: #ffffff !important; font-size: 14px;">WhatsApp</th>
+        <th style="padding: 6px; color: #ffffff !important; font-size: 14px;">Vencimento</th>
+        <th style="padding: 6px; color: #ffffff !important; font-size: 14px;">Status</th>
+        <th style="padding: 6px; color: #ffffff !important; font-size: 14px;">Valor</th>
+        <th style="padding: 6px; color: #ffffff !important; font-size: 14px;">Telas</th>
+        </tr>
+        </thead>
+        <tbody>"""
+        
         for c in clientes:
             status_limpo = str(c["status"]).strip().lower()
             
-            # Separação visual limpa e real de cores para cada tipo de situação
             if status_limpo in ["em dia", "recebido", "pago"]:
-                bg = "#065f46"  # Verde escuro nítido para pagantes
+                bg = "#065f46"  
             elif status_limpo in ["vencido", "vencidos"]:
-                bg = "#991b1b"  # Vermelho fechado para vencidos
+                bg = "#991b1b"  
             else:
-                bg = "#854d0e"  # Amarelo/Ouro escuro para pendentes / vencendo ou vendendo
+                bg = "#854d0e"  
                 
             html_table += f'<tr style="background-color: {bg}; border-bottom: 1px solid #475569;"><td style="padding: 6px; color: #ffffff !important; font-weight: bold; font-size: 13px;">{c["nome"]}</td><td style="padding: 6px; color: #ffffff !important; font-size: 13px;">{c["whatsapp"]}</td><td style="padding: 6px; color: #ffffff !important; font-size: 13px;">{c["vencimento"]}</td><td style="padding: 6px; color: #ffffff !important; font-size: 13px;">{c["status"]}</td><td style="padding: 6px; color: #ffffff !important; font-size: 13px;">R$ {c["valor"]:.2f}</td><td style="padding: 6px; color: #ffffff !important; font-size: 13px;">{c["telas"]}</td></tr>'
         html_table += "</tbody></table></div>"
@@ -445,7 +455,19 @@ if ROLE_LOGADO == "ADM":
         with engine.connect() as conn:
             df_users = pd.DataFrame(conn.execute(text("SELECT id, username, password, role, status, vencimento_usuario FROM vision_usuarios")).mappings().fetchall())
         if not df_users.empty:
-            html_users = '<div style="overflow-x:auto; background-color: #111827; padding: 12px; border-radius: 8px; border: 2px solid #334155;"><table style="width:100%; border-collapse: collapse; text-align: left;"><thead><tr style="background-color: #1e293b; border-bottom: 2px solid #475569;"><th style="padding: 6px; color: #ffffff !important; font-weight: bold;">ID</th><th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Usuário</th><th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Senha</th><th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Nível</th><th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Status</th><th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Vencimento</th></tr></thead><tbody>'
+            html_users = """<div style="overflow-x:auto; background-color: #111827; padding: 12px; border-radius: 8px; border: 2px solid #334155;">
+            <table style="width:100%; border-collapse: collapse; text-align: left;">
+            <thead>
+            <tr style="background-color: #1e293b; border-bottom: 2px solid #475569;">
+            <th style="padding: 6px; color: #ffffff !important; font-weight: bold;">ID</th>
+            <th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Usuário</th>
+            <th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Senha</th>
+            <th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Nível</th>
+            <th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Status</th>
+            <th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Vencimento</th>
+            </tr>
+            </thead>
+            <tbody>"""
             for idx, row in df_users.iterrows():
                 html_users += f'<tr style="border-bottom: 1px solid #334155; background-color: #1e293b;"><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">{row["id"]}</td><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">{row["username"]}</td><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">{row["password"]}</td><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">{row["role"]}</td><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">{row["status"]}</td><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">{row["vencimento_usuario"]}</td></tr>'
             html_users += "</tbody></table></div>"
@@ -453,8 +475,6 @@ if ROLE_LOGADO == "ADM":
 
 st.divider()
 
-# --- HISTÓRICO RECOLHIDO ---
+# --- HISTÓRICO RECOLHIDO (PROTEÇÃO COM ASPAS TRIPLAS FIXING SYNTAXERROR) ---
 st.subheader("💵 Seus Últimos Recebimentos")
-with st.expander("👁️ Clique para Abrir / Esconder o Histórico de Recebimentos", expanded=False):
-    if historico:
-        html_hist = '<div style="overflow-x:auto; background-color: #111827; padding: 8px; border-radius: 8px; border: 2px solid #334155;"><table style="width:100%; border-collapse: collapse; text-align: left;"><thead><tr style="background-color: #1e29
+with st.expander("👁️ Clique para Abrir /
