@@ -7,160 +7,143 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
 
-# Configuração da página
+# Configuração da página - Mantendo oculta por padrão para usar o layout customizado
 st.set_page_config(page_title="Vision Play TV", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
 
-# --- CSS PARA TRANSPARÊNCIA 100% E CORREÇÃO CRÍTICA DE VISIBILIDADE ---
+# --- CSS ULTRA REFORÇADO CONTRA FALHAS VISUAIS EM DISPOSITIVOS MÓVEIS ---
 st.markdown("""
     <style>
-    /* VARIÁVEIS DE TEMA NATIVAS - Força componentes internos (Canvas/Dataframe) a entrarem em Modo Escuro */
-    :root, .stApp {
-        --text-color: #ffffff !important;
-        --background-color: #0b0f19 !important;
-        --secondary-background-color: #131a2c !important;
-        --primary-color: #3b82f6 !important;
-    }
-
-    /* Ocultar completamente o cabeçalho padrão, menu nativo, deploy e ícones do GitHub */
-    .stAppHeader, [data-testid="stHeader"], [data-testid="stAppDeployButton"], #MainMenu { 
-        display: none !important; 
+    /* 1. APAGAR TOTALMENTE A BARRA CINZA SUPERIOR E ELEMENTOS DO GITHUB/DEPLOY */
+    header, [data-testid="stHeader"], .stAppHeader, [data-testid="stDecoration"] {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0px !important;
     }
     
-    /* Ocultar permanentemente a barra lateral nativa e as setas de controle */
-    [data-testid="stSidebar"], [data-testid="stSidebarCollapseButton"], .collapsedControl { 
-        display: none !important; 
-    }
-    
-    /* Ajuste de espaçamento superior devido à remoção do cabeçalho */
-    [data-testid="stMainBlockContainer"] {
-        padding-top: 2rem !important;
-    }
-
-    /* Fundo Geral do App */
-    .stApp { background-color: #0b0f19 !important; }
-    
-    /* CORREÇÃO CRÍTICA DE CORES DE TEXTOS, RÓTULOS E LABELS DO STREAMLIT */
-    h1, h2, h3, h4, p, label, .stMetric label, [data-testid="stWidgetLabel"] p { 
-        color: #ffffff !important; 
-    }
-    
-    /* Botões - 100% Transparentes com Bordas Destacadas */
-    button, [data-testid="stBaseButton-secondary"], [data-testid="stBaseButton-formSubmit"] { 
-        background-color: transparent !important; 
-        color: #ffffff !important; 
-        font-weight: bold !important;
-        border: 2px solid #3b82f6 !important;
-        border-radius: 8px !important;
-        transition: background-color 0.3s ease, border-color 0.3s ease;
-    }
-    button:hover {
-        background-color: rgba(59, 130, 246, 0.2) !important;
-        border-color: #60a5fa !important;
-    }
-    
-    /* CORREÇÃO BULLETPROOF DE VISIBILIDADE DOS INPUTS (TEXTO DIGITADO) */
-    input, textarea, [data-baseweb="input"], [data-baseweb="base-input"] {
-        background-color: #131a2c !important;
+    /* 2. REPOSICIONAR AS SETAS DO MENU LATERAL (>>) PERTO DO TÍTULO */
+    [data-testid="stSidebarCollapseButton"] {
+        display: flex !important;
+        visibility: visible !important;
+        position: absolute !important;
+        top: 15px !important;
+        left: 15px !important;
+        z-index: 99999 !important;
+        background-color: #2563eb !important;
         color: #ffffff !important;
-        -webkit-text-fill-color: #ffffff !important;
-    }
-    
-    .stTextInput input, .stNumberInput input, .stTextArea textarea { 
-        background-color: #131a2c !important; 
-        color: #ffffff !important; 
-        -webkit-text-fill-color: #ffffff !important;
-        border: 1px solid #3b82f6 !important; 
-        border-radius: 8px !important;
-    }
-
-    /* FORÇAR VISIBILIDADE DO TEXTO SELECIONADO DENTRO DO SELECTBOX */
-    div[data-baseweb="select"], 
-    div[data-baseweb="select"] *, 
-    .stSelectbox div, 
-    .stSelectbox span {
-        background-color: #131a2c !important;
-        color: #ffffff !important;
-        -webkit-text-fill-color: #ffffff !important;
-    }
-    .stSelectbox div[data-baseweb="select"] {
-        border: 1px solid #3b82f6 !important;
-        border-radius: 8px !important;
-    }
-
-    /* CORREÇÃO ABSOLUTA DOS DROPDOWNS EXIBIDOS AO CLICAR (LISTA DE OPÇÕES/STATUS) */
-    div[data-baseweb="popover"],
-    div[data-baseweb="popover"] *,
-    div[data-testid="stPopoverBody"],
-    ul[data-baseweb="menu"],
-    ul[data-baseweb="menu"] *,
-    li[role="option"],
-    li[role="option"] * {
-        background-color: #0b0f19 !important;
-        color: #ffffff !important;
-        -webkit-text-fill-color: #ffffff !important;
-    }
-    
-    /* Efeito de Hover nas opções da lista */
-    li[role="option"]:hover, li[role="option"]:hover * {
-        background-color: #3b82f6 !important;
-        color: #ffffff !important;
-    }
-
-    /* Forçar cor branca mesmo se o navegador usar preenchimento automático (Autofill) */
-    input:-webkit-autofill,
-    input:-webkit-autofill:hover, 
-    input:-webkit-autofill:focus,
-    textarea:-webkit-autofill,
-    textarea:-webkit-autofill:hover,
-    textarea:-webkit-autofill:focus {
-        -webkit-text-fill-color: #ffffff !important;
-        -webkit-box-shadow: 0 0 0px 1000px #131a2c inset !important;
-        transition: background-color 5000s ease-in-out 0s;
-    }
-    
-    /* Formulários com leve fundo para contraste ideal */
-    div[data-testid="stForm"] {
-        background-color: rgba(19, 26, 44, 0.3) !important;
-        border: 2px solid #3b82f6 !important;
-        border-radius: 12px !important;
-        padding: 20px !important;
-    }
-
-    /* Métricas 100% Transparentes */
-    [data-testid="stMetric"] { 
-        background-color: transparent !important; 
-        padding: 15px !important; 
-        border-radius: 10px !important; 
-        border: 2px solid #3b82f6 !important; 
-    }
-    
-    /* Abas (Tabs) 100% Transparentes */
-    .stTabs [data-baseweb="tab-list"] { 
-        background-color: transparent !important; 
-        gap: 10px; 
-    }
-    .stTabs [data-baseweb="tab"] { 
-        background-color: transparent !important; 
-        color: #ffffff !important; 
-        border: 1px solid transparent !important;
-    }
-    .stTabs [aria-selected="true"] { 
-        background-color: rgba(59, 130, 246, 0.2) !important; 
-        color: #ffffff !important; 
-        border: 2px solid #3b82f6 !important;
+        border: 2px solid #ffffff !important;
         border-radius: 6px !important;
     }
-
-    /* CORREÇÃO CRÍTICA DO DATAFRAME/TABELA (Fundo e Cor de Texto Forçados) */
-    div[data-testid="stDataFrame"], 
-    div[data-testid="stDataFrame"] > div {
-        background-color: #131a2c !important;
-    }
-    div[data-testid="stDataFrame"] td, 
-    div[data-testid="stDataFrame"] th,
-    table td, 
-    table th {
+    [data-testid="stSidebarCollapseButton"] svg {
+        fill: #ffffff !important;
         color: #ffffff !important;
+    }
+    
+    /* 3. FUNDO DO APLICATIVO EM TOM ESCURO SÓLIDO */
+    .stApp { background-color: #0b0f19 !important; }
+    
+    /* 4. TÍTULOS, TEXTOS E LABELS COM MÁXIMA NITIDEZ */
+    h1, h2, h3, h4, h5, h6 { color: #ffffff !important; font-weight: 800 !important; }
+    p, span, label, .stMarkdown, [data-testid="stWidgetLabel"] p { color: #f1f5f9 !important; font-size: 16px !important; font-weight: 600 !important; }
+    
+    /* 5. CORREÇÃO RADICAL PARA CAIXAS DE SELEÇÃO E TEXTOS INVISÍVEIS (SELECTBOX / DROPDOWN / SEARCH) */
+    div[data-baseweb="select"] > div {
+        background-color: #1e293b !important;
+        color: #ffffff !important;
+        border: 2px solid #64748b !important;
+    }
+    
+    /* Forçar texto visível ao digitar na caixa de busca de clientes */
+    div[data-baseweb="select"] input, input[role="combobox"] {
+        color: #ffffff !important;
+        background-color: transparent !important;
+        -webkit-text-fill-color: #ffffff !important;
+    }
+
+    /* Alvo nos elementos flutuantes globais injetados na raiz da página */
+    [data-baseweb="popover"], [data-baseweb="menu"], [role="listbox"], [role="option"], li[role="option"] {
+        background-color: #1e293b !important;
+        color: #ffffff !important;
+    }
+    
+    [role="listbox"] *, [role="option"] *, li[role="option"] * {
+        color: #ffffff !important;
+    }
+
+    li[role="option"]:hover, li[role="option"]:hover * {
+        background-color: #2563eb !important;
+        color: #ffffff !important;
+    }
+    
+    /* 6. CORREÇÃO INTEGRAL DO POPOVER (⚙️ CONFIGURAÇÕES) VISIBILIDADE */
+    div[data-testid="stPopover"] button {
+        background-color: #2563eb !important;
+        color: #ffffff !important;
+        font-weight: bold !important;
+        border: 2px solid #ffffff !important;
+        border-radius: 6px !important;
+    }
+    div[data-testid="stPopover"] button p {
+        color: #ffffff !important;
+    }
+    
+    /* Forçar caixa interna do Popover Aberto a ficar escura com texto branco */
+    div[data-testid="stPopoverBody"], div[data-testid="stPopoverBody"] *, div[data-testid="stPopoverBody"] p {
+        background-color: #1e293b !important;
+        color: #ffffff !important;
+    }
+
+    /* 7. INPUTS GERAIS E REMOÇÃO DO AUTOFILL DO NAVEGADOR */
+    input, textarea {
+        background-color: #1e293b !important;
+        color: #ffffff !important;
+        border: 2px solid #64748b !important;
+    }
+    input:-webkit-autofill {
+        -webkit-box-shadow: 0 0 0 100px #1e293b inset !important;
+        -webkit-text-fill-color: #ffffff !important;
+    }
+
+    /* 8. ESTILIZAÇÃO DOS BOTÕES OPERACIONAIS DO SISTEMA */
+    .stButton > button, [data-testid="stFormSubmitButton"] button { 
+        background-color: #2563eb !important; 
+        color: #ffffff !important; 
+        font-weight: bold !important;
+        border: 2px solid #ffffff !important;
+        border-radius: 6px !important;
+    }
+    
+    /* 9. LAYOUT DOS BLOCOS DE MÉTRICAS */
+    [data-testid="stMetric"] { 
+        background-color: #1e293b !important; 
+        padding: 18px !important; 
+        border-radius: 10px !important; 
+        border: 2px solid #475569 !important; 
+    }
+    [data-testid="stMetricValue"] > div { color: #38bdf8 !important; font-weight: 800 !important; font-size: 26px !important; }
+    [data-testid="stMetricLabel"] > div { color: #cbd5e1 !important; font-weight: bold !important; }
+    
+    /* 10. ESTILO DAS ABAS */
+    .stTabs [data-baseweb="tab"] { 
+        background-color: #1e293b !important; 
+        color: #ffffff !important; 
+        border: 2px solid #475569 !important;
+        border-radius: 6px 6px 0 0 !important;
+    }
+    .stTabs [aria-selected="true"] { 
+        background-color: #2563eb !important; 
+        border-color: #ffffff !important;
+    }
+    
+    /* Customização da Sidebar quando estiver aberta */
+    [data-testid="stSidebar"] {
+        background-color: #0f172a !important;
+        border-right: 2px solid #334155 !important;
+    }
+
+    /* 11. GARANTIR VISIBILIDADE ABSOLUTA DE TEXTOS DENTRO DE TABELAS HTML */
+    table, tr, td, th {
+        color: #ffffff !important;
+        font-size: 14px !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -171,7 +154,7 @@ agora_br = datetime.now(CORRETO_FUSO)
 hoje = agora_br.date()
 
 # ======================================
-# CONEXÃO SEGURA COM O SUPABASE
+# CONEXÃO SEGURA COM O BANCO DE DADOS
 # ======================================
 @st.cache_resource
 def get_engine():
@@ -181,7 +164,7 @@ engine = get_engine()
 
 def inicializar_banco():
     with engine.begin() as conn:
-        # Tabela de Usuários
+        # Tabela de Usuários / Revendedores
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS vision_usuarios (
                 id SERIAL PRIMARY KEY,
@@ -195,7 +178,6 @@ def inicializar_banco():
         conn.execute(text("ALTER TABLE vision_usuarios ADD COLUMN IF NOT EXISTS vencimento_usuario VARCHAR(50);"))
         conn.execute(text("UPDATE vision_usuarios SET vencimento_usuario = '31/12/2030' WHERE vencimento_usuario IS NULL;"))
         
-        # Garante o admin padrão
         total_usuarios = conn.execute(text("SELECT COUNT(*) FROM vision_usuarios")).scalar()
         if total_usuarios == 0:
             conn.execute(text("""
@@ -216,11 +198,9 @@ def inicializar_banco():
         """))
         conn.execute(text("ALTER TABLE vision_clientes ADD COLUMN IF NOT EXISTS telas INTEGER DEFAULT 1;"))
         conn.execute(text("ALTER TABLE vision_clientes ADD COLUMN IF NOT EXISTS usuario_owner VARCHAR(255) DEFAULT 'admin';"))
-        
-        # Garante que clientes antigos que não tinham dono (NULL) virem do 'admin'
         conn.execute(text("UPDATE vision_clientes SET usuario_owner = 'admin' WHERE usuario_owner IS NULL OR TRIM(usuario_owner) = '';"))
         
-        # Tabela de Histórico
+        # Tabela de Histórico Financeiro
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS vision_historico (
                 id SERIAL PRIMARY KEY,
@@ -235,7 +215,7 @@ def inicializar_banco():
 inicializar_banco()
 
 # ======================================
-# SISTEMA DE CONTROLE DE LOGIN E SESSÃO
+# CONTROLADOR DE LOGIN E ACESSO
 # ======================================
 if "logado" not in st.session_state:
     st.session_state["logado"] = False
@@ -243,371 +223,264 @@ if "logado" not in st.session_state:
     st.session_state["usuario_role"] = ""
 
 if not st.session_state["logado"]:
-    st.markdown("""
-        <style>
-            [data-testid="stMainBlockContainer"] {
-                max-width: 520px !important;
-                margin: 0 auto !important;
-                padding-top: 8rem !important;
-            }
-        </style>
-    """, unsafe_allow_html=True)
-    
+    st.markdown("<style>[data-testid='stMainBlockContainer'] { max-width: 520px !important; margin: 0 auto !important; padding-top: 6rem !important; }</style>", unsafe_allow_html=True)
     with st.form("form_login", clear_on_submit=True):
         st.markdown("<h2 style='text-align: center;'>🔒 Vision Play TV</h2>", unsafe_allow_html=True)
-        st.markdown("<h4 style='text-align: center; color: #ffffff !important; font-size: 14px;'>Insira suas credenciais</h4>", unsafe_allow_html=True)
-        
+        st.markdown("<p style='text-align: center; color: #cbd5e1 !important;'>Insira suas credenciais</p>", unsafe_allow_html=True)
         user_input = st.text_input("Usuário:").strip().lower()
         pass_input = st.text_input("Senha:", type="password").strip()
-        btn_login = st.form_submit_button("Entrar no Sistema", use_container_width=True)
-        
-        if btn_login:
-            if not user_input or not pass_input:
-                st.error("Por favor, preencha todos os campos.")
-            else:
-                with engine.connect() as conn:
-                    row = conn.execute(
-                        text("""
-                            SELECT username, role, status, vencimento_usuario 
-                            FROM vision_usuarios 
-                            WHERE TRIM(LOWER(username)) = :u AND TRIM(password) = :p
-                        """), {"u": user_input, "p": pass_input}
-                    ).mappings().fetchone()
-                    
-                    if row:
-                        status_atual = str(row["status"]).strip()
-                        venc_str = str(row["vencimento_usuario"]).strip()
-                        role_atual = str(row["role"]).strip()
-                        
-                        conta_vencida = False
-                        try:
-                            data_venc = datetime.strptime(venc_str, "%d/%m/%Y").date()
-                            if data_venc < hoje: conta_vencida = True
-                        except: pass
-                        
-                        if status_atual == "Bloqueado" or (conta_vencida and role_atual != "ADM"):
-                            st.error("🚫 Conta vencida ou bloqueada!")
-                        else:
-                            st.session_state["logado"] = True
-                            st.session_state["usuario_nome"] = str(row["username"]).strip().lower()
-                            st.session_state["usuario_role"] = role_atual
-                            st.rerun()
+        if st.form_submit_button("Entrar no Sistema", use_container_width=True):
+            with engine.connect() as conn:
+                row = conn.execute(text("SELECT username, role, status, vencimento_usuario FROM vision_usuarios WHERE TRIM(LOWER(username)) = :u AND TRIM(password) = :p"), {"u": user_input, "p": pass_input}).mappings().fetchone()
+                if row:
+                    if str(row["status"]).strip() == "Bloqueado":
+                        st.error("🚫 Conta bloqueada!")
                     else:
-                        st.error("Credenciais incorretas.")
+                        st.session_state["logado"] = True
+                        st.session_state["usuario_nome"] = str(row["username"]).strip().lower()
+                        st.session_state["usuario_role"] = str(row["role"]).strip()
+                        st.rerun()
+                else: st.error("Credenciais incorretas.")
     st.stop()
 
-# ==============================================================================
-# ÁREA DO DASHBOARD
-# ==============================================================================
 USUARIO_LOGADO = st.session_state["usuario_nome"]
 ROLE_LOGADO = st.session_state["usuario_role"]
 
-if "pagina_atual" not in st.session_state:
-    st.session_state["pagina_atual"] = "dashboard"
+# --- BARRA LATERAL (SIDEBAR) ---
+with st.sidebar:
+    st.markdown("## 📋 Menu Vision Play")
+    st.markdown(f"👤 **Usuário:** `{USUARIO_LOGADO}`")
+    st.markdown(f"🎖️ **Nível:** `{ROLE_LOGADO}`")
+    st.divider()
+    if st.button("🚪 Desconectar", use_container_width=True):
+        st.session_state.clear()
+        st.rerun()
 
-menu_opcoes = st.popover("📋 Menu", use_container_width=False)
-menu_opcoes.markdown("### 📋 Menu Principal")
-menu_opcoes.markdown(f"👤 **Usuário:** `{USUARIO_LOGADO}`")
-menu_opcoes.markdown(f"🎖️ **Nível:** `{ROLE_LOGADO}`")
-menu_opcoes.divider()
+# --- BLOCO SUPERIOR COM TÍTULO E BOTÃO POPOVER ---
+col_titulo, col_menu = st.columns([3, 1])
+with col_titulo:
+    st.markdown("<h1 style='padding-left: 55px; margin-top: -10px;'>📊 Dashboard Vision Play TV</h1>", unsafe_allow_html=True)
 
-if menu_opcoes.button("👥 Clientes", use_container_width=True, key=f"nav_cli_{USUARIO_LOGADO}"):
-    st.session_state["pagina_atual"] = "clientes"
-    st.rerun()
-
-if menu_opcoes.button("📊 Dashboard", use_container_width=True, key=f"nav_dash_{USUARIO_LOGADO}"):
-    st.session_state["pagina_atual"] = "dashboard"
-    st.rerun()
-
-menu_opcoes.divider()
+with col_menu:
+    with st.popover("⚙️ Configurações", use_container_width=True):
+        st.markdown("<h4>🔧 Opções do Sistema</h4>", unsafe_allow_html=True)
+        st.divider()
+        if ROLE_LOGADO == "ADM":
+            if st.button("🔄 Sincronizar Banco", use_container_width=True, key="pop_sync"):
+                st.rerun()
+        if st.button("🚪 Sair do Sistema", use_container_width=True, key="pop_sair"):
+            st.session_state.clear()
+            st.rerun()
 
 def carregar_dados_privados(dono_da_conta):
     with engine.connect() as conn:
-        res_clientes = conn.execute(text("""
-            SELECT nome, whatsapp, vencimento, status, valor, telas 
-            FROM vision_clientes 
-            WHERE TRIM(LOWER(COALESCE(usuario_owner, 'admin'))) = TRIM(LOWER(:u)) 
-            ORDER BY nome
-        """), {"u": dono_da_conta}).fetchall()
-        
-        res_historico = conn.execute(text("""
-            SELECT cliente, valor, data 
-            FROM vision_historico 
-            WHERE TRIM(LOWER(COALESCE(usuario_owner, 'admin'))) = TRIM(LOWER(:u)) 
-            ORDER BY id ASC
-        """), {"u": dono_da_conta}).fetchall()
-        
-        lst_clientes = [{"nome": r[0], "whatsapp": r[1], "vencimento": r[2], "status": r[3], "valor": float(r[4] or 0), "telas": int(r[5] or 1)} for r in res_clientes]
-        lst_historico = [{"cliente": r[0], "valor": float(r[1] or 0), "data": r[2]} for r in res_historico]
-        return lst_clientes, lst_historico
+        res_clientes = conn.execute(text("SELECT nome, whatsapp, vencimento, status, valor, telas FROM vision_clientes WHERE TRIM(LOWER(COALESCE(usuario_owner, 'admin'))) = TRIM(LOWER(:u)) ORDER BY nome"), {"u": dono_da_conta}).fetchall()
+        res_historico = conn.execute(text("SELECT cliente, valor, data FROM vision_historico WHERE TRIM(LOWER(COALESCE(usuario_owner, 'admin'))) = TRIM(LOWER(:u)) ORDER BY id ASC"), {"u": dono_da_conta}).fetchall()
+        return [{"nome": r[0], "whatsapp": r[1], "vencimento": r[2], "status": r[3], "valor": float(r[4] or 0), "telas": int(r[5] or 1)} for r in res_clientes], [{"cliente": r[0], "valor": float(r[1] or 0), "data": r[2]} for r in res_historico]
 
 clientes, historico = carregar_dados_privados(USUARIO_LOGADO)
 
-@st.dialog("🧹 Zerar Período")
-def abrir_popup_limpeza():
-    st.write("Digite o **Dia/Mês** dos seus recebimentos que deseja limpar.")
-    data_limpar = st.text_input("Data (Ex: 10/06 ou /06):", value=hoje.strftime("%d/%m"), key=f"inp_cl_{USUARIO_LOGADO}")
-    st.warning("⚠️ Isso apagará APENAS os seus registros desta data!")
-
-    if st.button("🔥 Confirmar", use_container_width=True, key=f"btn_cl_{USUARIO_LOGADO}"):
-        if data_limpar.strip():
-            with engine.begin() as conn:
-                conn.execute(text("""
-                    DELETE FROM vision_historico 
-                    WHERE data LIKE :padrao AND TRIM(LOWER(usuario_owner)) = TRIM(LOWER(:owner))
-                """), {"padrao": f"%{data_limpar.strip()}%", "owner": USUARIO_LOGADO})
-            st.rerun()
-
-if ROLE_LOGADO == "ADM":
-    if menu_opcoes.button("🔄 Sincronizar Banco", use_container_width=True, key=f"sync_{USUARIO_LOGADO}"):
-        st.rerun()
-
-if menu_opcoes.button("🧹 Limpar Histórico", use_container_width=True, key=f"clean_{USUARIO_LOGADO}"):
-    abrir_popup_limpeza()
-
-if menu_opcoes.button("🚪 Sair", use_container_width=True, key=f"exit_{USUARIO_LOGADO}"):
-    st.session_state.clear()
-    st.rerun()
-
-# CÁLCULOS DO PAINEL
+# CÁLCULOS DOS CONTADORES DO PAINEL E SINCRONIZAÇÃO DA PIZZA
 total_clientes = len(clientes)
 em_dia, vencendo, vencidos = 0, 0, 0
 receita_prevista, receita_recebida = 0, 0
 
-for cliente in clientes:
-    receita_prevista += float(cliente.get("valor", 0))
-    try:
-        vencimento = datetime.strptime(cliente["vencimento"], "%d/%m/%Y").date()
-        dias = (vencimento - hoje).days
-        if dias < 0: vencidos += 1
-        elif dias <= 2: vencendo += 1
-        else: em_dia += 1
-    except: pass
+# Contadores financeiros dedicados ao gráfico de pizza dinâmico conforme pagamentos mudam
+valor_pago = 0.0
+valor_vencido = 0.0
+valor_a_vencer = 0.0
 
-for item in historico:
-    receita_recebida += float(item.get("valor", 0))
-
-receita_pendente = receita_prevista - receita_recebida
-
-# ==============================================================================
-# RENDERIZAÇÃO CONDICIONAL DE TELAS
-# ==============================================================================
-if st.session_state["pagina_atual"] == "dashboard":
-    st.title("📊 Dashboard Vision Play TV")
+for cl in clientes:
+    receita_prevista += cl["valor"]
+    status_limpo = str(cl["status"]).strip().lower()
     
-    with st.container():
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("👥 Seus Clientes", total_clientes)
-        c2.metric("💰 Sua Previsão", f"R$ {receita_prevista:.2f}")
-        c3.metric("✅ Seu Recebido", f"R$ {receita_recebida:.2f}")
-        c4.metric("⚠️ Seu Pendente", f"R$ {receita_pendente:.2f}")
-
-    st.divider()
-
-    col1, col2 = st.columns(2)
-    with col1:
-        if total_clientes > 0:
-            st.plotly_chart(px.pie(pd.DataFrame({"Status": ["Em Dia", "Vencendo", "Vencidos"], "Quantidade": [em_dia, vencendo, vencidos]}), names="Status", values="Quantidade", title="Seus Clientes"), use_container_width=True)
-        else:
-            st.info("Nenhum cliente para gerar gráfico.")
-    with col2:
-        if receita_prevista > 0:
-            st.plotly_chart(px.pie(pd.DataFrame({"Tipo": ["Recebido", "Pendente"], "Valor": [receita_recebida, receita_pendente]}), names="Tipo", values="Valor", title="Seu Financeiro"), use_container_width=True)
-        else:
-            st.info("Financeiro zerado.")
-
-    st.divider()
-    st.subheader("💵 Seus Últimos Recebimentos")
-    if historico: st.dataframe(pd.DataFrame(list(reversed(historico))[:10]), use_container_width=True, hide_index=True)
-    else: st.info("Nenhum registro seu.")
-
-elif st.session_state["pagina_atual"] == "clientes":
-    st.title("👥 Gerenciamento de Clientes")
-    
-    st.subheader("📋 Status Geral de Pagamentos")
-    if clientes:
-        df_status = pd.DataFrame(clientes)[["nome", "status", "vencimento"]]
-        df_status.columns = ["Nome do Cliente", "Status Atual", "Vencimento"]
-        
-        def aplicar_cores_status(row):
-            cor_pago = "background-color: rgba(16, 185, 129, 0.2); color: #10b981; font-weight: bold;"
-            cor_pendente = "background-color: rgba(239, 68, 68, 0.2); color: #ef4444; font-weight: bold;"
-            stilo = cor_pago if row["Status Atual"] in ["Recebido", "Em Dia"] else cor_pendente
-            return [stilo] * len(row)
-            
-        st.dataframe(df_status.style.apply(aplicar_cores_status, axis=1), use_container_width=True, hide_index=True)
+    if status_limpo in ["em dia", "recebido", "pago"]:
+        valor_pago += cl["valor"]
+        em_dia += 1
+    elif status_limpo in ["vencido", "vencidos"]:
+        valor_vencido += cl["valor"]
+        vencidos += 1
     else:
+        valor_a_vencer += cl["valor"]
+        vencendo += 1
+
+for item in historico: receita_recebida += item["valor"]
+receita_pendente = max(0.0, receita_prevista - receita_recebida)
+
+with st.container():
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("👥 Seus Clientes", total_clientes)
+    c2.metric("💰 Sua Previsão", f"R$ {receita_prevista:.2f}")
+    c3.metric("✅ Seu Recebido", f"R$ {receita_recebida:.2f}")
+    c4.metric("⚠️ Seu Pendente", f"R$ {receita_pendente:.2f}")
+
+st.divider()
+
+# --- INTEGRANDO GRÁFICOS EM PIZZA TRANSPARENTES ---
+col1, col2 = st.columns(2)
+with col1:
+    if total_clientes > 0:
+        df_cli = pd.DataFrame({"Status": ["Em Dia", "Vencendo", "Vencidos"], "Qtd": [em_dia, vencendo, vencidos]})
+        df_cli = df_cli[df_cli["Qtd"] > 0]
+        fig_cli = px.pie(df_cli, names="Status", values="Qtd", title="Situação dos Clientes (Quantidade)",
+                         color="Status", color_discrete_map={"Em Dia": "#10b981", "Vencendo": "#f59e0b", "Vencidos": "#ef4444"})
+        fig_cli.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='#ffffff', title_font_color='#ffffff', legend_font_color='#ffffff')
+        st.plotly_chart(fig_cli, use_container_width=True, config={'displayModeBar': False})
+    else: st.info("Nenhum cliente para gerar gráfico.")
+
+with col2:
+    if receita_prevista > 0:
+        df_fin = pd.DataFrame({
+            "Tipo": ["Pago", "Vencido", "A Vencer"], 
+            "Valor": [valor_pago, valor_vencido, valor_a_vencer]
+        })
+        df_fin = df_fin[df_fin["Valor"] > 0]
+        fig_fin = px.pie(df_fin, names="Tipo", values="Valor", title="Divisão Financeira (R$)",
+                         color="Tipo", color_discrete_map={"Pago": "#10b981", "Vencido": "#ef4444", "A Vencer": "#f59e0b"})
+        fig_fin.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='#ffffff', title_font_color='#ffffff', legend_font_color='#ffffff')
+        st.plotly_chart(fig_fin, use_container_width=True, config={'displayModeBar': False})
+    else: st.info("Financeiro zerado.")
+
+st.divider()
+
+# --- LISTA DE CLIENTES COMPACTA APENAS COM NOMES ---
+st.subheader("👥 Nomes dos Clientes Cadastrados")
+with st.expander("""👁️ Clique para Abrir / Esconder a Lista de Nomes""", expanded=False):
+    if clientes:
+        html_nomes = """<div style="overflow-x:auto; background-color: #111827; padding: 12px; border-radius: 8px; border: 2px solid #334155;">
+        <table style="width:100%; border-collapse: collapse; text-align: left;">
+        <thead>
+        <tr style="background-color: #1e293b; border-bottom: 2px solid #64748b;">
+        <th style="padding: 10px; color: #ffffff !important; font-size: 15px; font-weight: bold;">Nome do Cliente</th>
+        </tr>
+        </thead>
+        <tbody>"""
+        
+        for c in clientes:
+            html_nomes += f'<tr style="border-bottom: 1px solid #334155; background-color: #1e293b;"><td style="padding: 10px; color: #ffffff !important; font-weight: 600; font-size: 14px;">{c["nome"]}</td></tr>'
+            
+        html_nomes += "</tbody></table></div>"
+        st.markdown(html_nomes, unsafe_allow_html=True)
+    else: 
         st.info("Nenhum cliente cadastrado.")
 
-    st.divider()
+st.divider()
 
-    st.subheader("⚙️ Gerenciamento do Sistema")
-    abas_disponiveis = ["💵 Registrar Pagamento", "➕ Novo Cliente", "🚀 Cadastro em Massa", "✏️ Editar / Excluir"]
-    if ROLE_LOGADO == "ADM": abas_disponiveis.append("👤 Painel ADM (Contas)")
-    abas = st.tabs(abas_disponiveis)
+# ======================================
+# ABAS DE GESTÃO E CONTEÚDOS COMPLETOS
+# ======================================
+st.subheader("⚙️ Gerenciamento do Sistema")
+abas_disponiveis = ["💵 Registrar Pagamento", "➕ Novo Cliente", "✏️ Editar / Excluir"]
+if ROLE_LOGADO == "ADM": abas_disponiveis.append("👤 Painel ADM (Contas)")
+abas = st.tabs(abas_disponiveis)
 
-    with abas[0]:
-        if clientes:
-            sel = st.selectbox("Escolha o Cliente:", [c["nome"] for c in clientes], key=f"sel_pag_{USUARIO_LOGADO}")
-            cli = next(c for c in clientes if c["nome"] == sel)
-            st.markdown(f"💰 **Mensalidade:** `R$ {float(cli.get('valor', 25.0)):.2f}`")
-            if st.button("⚡ Confirmar Pagamento", key=f"btn_pag_{USUARIO_LOGADO}"):
-                novo_mes = hoje.month + 1 if hoje.day > 10 else hoje.month
-                novo_ano = hoje.year + (1 if novo_mes > 12 else 0)
-                novo_mes = 1 if novo_mes > 12 else novo_mes
-                novo_vencimento = datetime(novo_ano, novo_mes, 10).strftime("%d/%m/%Y")
+with abas[0]:
+    if clientes:
+        sel = st.selectbox("Escolha o Cliente para pagar:", [c["nome"] for c in clientes], key="sb_p")
+        cli = next(c for c in clientes if c["nome"] == sel)
+        st.write(f"💰 Valor da mensalidade: **R$ {cli['valor']:.2f}**")
+        if st.button("⚡ Confirmar Pagamento", use_container_width=True):
+            prox_venc = (datetime.strptime(cli["vencimento"], "%d/%m/%Y") + timedelta(days=30)).strftime("%d/%m/%Y")
+            with engine.begin() as conn:
+                conn.execute(text("UPDATE vision_clientes SET status = 'Em Dia', vencimento = :v WHERE nome = :n AND usuario_owner = :o"), {"v": prox_venc, "n": cli["nome"], "o": USUARIO_LOGADO})
+                conn.execute(text("INSERT INTO vision_historico (cliente, valor, data, usuario_owner) VALUES (:c, :v, :d, :o)"), {"c": cli["nome"], "v": cli["valor"], "d": agora_br.strftime("%d/%m/%Y %H:%M"), "o": USUARIO_LOGADO})
+            st.success("Pagamento registrado com sucesso!")
+            st.rerun()
+    else: st.info("Sem clientes.")
+
+with abas[1]:
+    with st.form("f_cad", clear_on_submit=True):
+        n_nome = st.text_input("Nome do Cliente:")
+        n_whats = st.text_input("WhatsApp:")
+        n_venc = st.text_input("Vencimento (DD/MM/AAAA):", value=hoje.strftime("10/%m/%Y"))
+        n_status = st.selectbox("Status:", ["Em Dia", "Vencendo", "Vencidos"])
+        n_telas = st.number_input("Quantidade de Telas:", min_value=1, value=1)
+        n_val = st.number_input("Valor da Mensalidade:", min_value=0.0, value=25.0)
+        if st.form_submit_button("➕ Salvar Cliente", use_container_width=True):
+            if n_nome.strip():
                 with engine.begin() as conn:
-                    conn.execute(text("UPDATE vision_clientes SET status = 'Recebido', vencimento = :vencimento WHERE nome = :nome AND TRIM(LOWER(usuario_owner)) = :owner"), {"vencimento": novo_vencimento, "nome": cli["nome"], "owner": USUARIO_LOGADO})
-                    conn.execute(text("INSERT INTO vision_historico (cliente, valor, data, usuario_owner) VALUES (:cliente, :valor, :data, :owner)"), {"cliente": cli["nome"], "valor": cli["valor"], "data": agora_br.strftime("%d/%m/%Y %H:%M"), "owner": USUARIO_LOGADO})
-                st.success("Sucesso!")
-                st.rerun()
-        else: st.info("Sem clientes.")
-
-    with abas[1]:
-        with st.form(f"form_cad_{USUARIO_LOGADO}", clear_on_submit=False):
-            n_nome = st.text_input("Nome do Cliente:")
-            n_whats = st.text_input("WhatsApp:")
-            n_venc = st.text_input("Vencimento:", value=hoje.strftime("10/%m/%Y"))
-            n_status = st.selectbox("Status:", ["Em Dia", "Vencendo", "Vencidos"])
-            n_telas = st.number_input("Telas:", min_value=1, value=1)
-            n_valor = st.number_input("Valor (R$):", min_value=0.0, value=25.0)
-            if st.form_submit_button("➕ Salvar Cliente"):
-                if n_nome.strip():
-                    try:
-                        with engine.begin() as conn:
-                            conn.execute(text("INSERT INTO vision_clientes (nome, whatsapp, vencimento, status, valor, telas, usuario_owner) VALUES (:n, :w, :v, :s, :val, :t, :owner)"), {"n": n_nome.strip(), "w": n_whats.strip(), "v": n_venc.strip(), "s": n_status, "val": n_valor, "t": int(n_telas), "owner": USUARIO_LOGADO})
-                        st.success("Salvo!")
-                        st.rerun()
-                    except: st.error("Erro: Um cliente com esse nome já existe.")
-
-    with abas[2]:
-        st.markdown("### 🚀 Importar Lista de Clientes em Massa")
-        st.markdown("Cole os seus clientes abaixo seguindo o formato padrão: `Nome, WhatsApp` (um cliente por linha).")
-        
-        col_m1, col_m2 = st.columns(2)
-        with col_m1:
-            m_venc = st.text_input("Vencimento Padrão:", value=hoje.strftime("10/%m/%Y"), key="m_venc")
-            m_status = st.selectbox("Status Padrão:", ["Em Dia", "Vencendo", "Vencidos"], key="m_status")
-        with col_m2:
-            m_telas = st.number_input("Telas Padrão:", min_value=1, value=1, key="m_telas")
-            m_valor = st.number_input("Valor Padrão (R$):", min_value=0.0, value=25.0, key="m_valor")
-            
-        lista_massa = st.text_area("Cole os dados aqui:", height=250, placeholder="Nome do Cliente, WhatsApp", key="txt_lista_massa")
-        
-        if st.button("🚀 Processar e Salvar Tudo", use_container_width=True, key="btn_salvar_massa"):
-            if lista_massa.strip():
-                linhas = lista_massa.strip().split("\n")
-                sucessos = 0
-                falhas = 0
-                
-                with engine.begin() as conn:
-                    for linha in Pandas:
-                        if not linha.strip():
-                            continue
-                        if "," in linha:
-                            partes = linha.split(",", 1)
-                            nome_c = partes[0].strip()
-                            whats_c = partes[1].strip()
-                        elif ";" in linha:
-                            partes = linha.split(";", 1)
-                            nome_c = partes[0].strip()
-                            whats_c = partes[1].strip()
-                        else:
-                            nome_c = linha.strip()
-                            whats_c = ""
-                            
-                        if nome_c:
-                            try:
-                                conn.execute(text("""
-                                    INSERT INTO vision_clientes (nome, whatsapp, vencimento, status, valor, telas, usuario_owner) 
-                                    VALUES (:n, :w, :v, :s, :val, :t, :owner)
-                                """), {
-                                    "n": nome_c, "w": whats_c, "v": m_venc.strip(), "s": m_status, "val": m_valor, "t": int(m_telas), "owner": USUARIO_LOGADO
-                                })
-                                sucessos += 1
-                            except:
-                                falhas += 1
-                                
-                st.success(f"🔥 Importação finalizada! {sucessos} clientes adicionados.")
-                if falhas > 0:
-                    st.warning(f"⚠️ {falhas} registros pulados (nomes repetidos).")
+                    conn.execute(text("INSERT INTO vision_clientes (nome, whatsapp, vencimento, status, valor, telas, usuario_owner) VALUES (:n, :w, :v, :s, :val, :t, :o)"), {"n": n_nome.strip(), "w": n_whats.strip(), "v": n_venc.strip(), "s": n_status, "val": n_val, "t": int(n_telas), "o": USUARIO_LOGADO})
+                st.success("Cliente salvo!")
                 st.rerun()
 
+with abas[2]:
+    if clientes:
+        sel_ed = st.selectbox("Selecione quem deseja alterar:", [c["nome"] for c in clientes], key="sb_e")
+        cli_ed = next(c for c in clientes if c["nome"] == sel_ed)
+        with st.form("f_ed"):
+            e_w = st.text_input("WhatsApp:", value=cli_ed["whatsapp"])
+            e_v = st.text_input("Vencimento:", value=cli_ed["vencimento"])
+            e_s = st.selectbox("Status:", ["Em Dia", "Vencendo", "Vencidos"], index=["Em Dia", "Vencendo", "Vencidos"].index(cli_ed["status"]) if cli_ed["status"] in ["Em Dia", "Vencendo", "Vencidos"] else 0)
+            e_t = st.number_input("Telas:", min_value=1, value=int(cli_ed["telas"]))
+            e_val = st.number_input("Valor:", min_value=0.0, value=cli_ed["valor"])
+            c_b1, c_b2 = st.columns(2)
+            if c_b1.form_submit_button("💾 Atualizar", use_container_width=True):
+                with engine.begin() as conn:
+                    conn.execute(text("UPDATE vision_clientes SET whatsapp=:w, vencimento=:v, status=:s, valor=:val, telas=:t WHERE nome=:n AND usuario_owner=:o"), {"w": e_w, "v": e_v, "s": e_s, "val": e_val, "t": int(e_t), "n": cli_ed["nome"], "o": USUARIO_LOGADO})
+                st.rerun()
+            if c_b2.form_submit_button("🚨 Excluir", use_container_width=True):
+                with engine.begin() as conn:
+                    conn.execute(text("DELETE FROM vision_clientes WHERE nome=:n AND usuario_owner=:o"), {"n": cli_ed["nome"], "o": USUARIO_LOGADO})
+                st.rerun()
+
+if ROLE_LOGADO == "ADM":
     with abas[3]:
-        if clientes:
-            sel_ed = st.selectbox("Selecione para editar:", [c["nome"] for c in clientes], key=f"sel_ed_{USUARIO_LOGADO}")
-            cli_ed = next(c for c in clientes if c["nome"] == sel_ed)
-            with st.form(f"form_ed_{USUARIO_LOGADO}"):
-                e_w = st.text_input("WhatsApp:", value=cli_ed["whatsapp"])
-                e_v = st.text_input("Vencimento:", value=cli_ed["vencimento"])
-                e_s = st.selectbox("Status:", ["Em Dia", "Vencendo", "Vencidos"], index=["Em Dia", "Vencendo", "Vencidos"].index(cli_ed["status"]) if cli_ed["status"] in ["Em Dia", "Vencendo", "Vencidos"] else 0)
-                e_t = st.number_input("Telas:", min_value=1, value=int(cli_ed.get("telas", 1)))
-                e_val = st.number_input("Valor:", min_value=0.0, value=float(cli_ed["valor"]))
-                c_ed1, c_ed2 = st.columns(2)
-                if c_ed1.form_submit_button("💾 Atualizar"):
+        st.subheader("Gerenciar Revendedores / Usuários")
+        with st.form("f_new_usr", clear_on_submit=True):
+            u_nome = st.text_input("Login:").strip().lower()
+            u_pass = st.text_input("Senha:").strip()
+            u_role = st.selectbox("Nível de Acesso:", ["USER", "ADM"])
+            u_dias = st.number_input("Dias de Vencimento da Conta:", min_value=1, value=30)
+            if st.form_submit_button("Criar Nova Conta", use_container_width=True):
+                venc = (hoje + timedelta(days=u_dias)).strftime("%d/%m/%Y")
+                try:
                     with engine.begin() as conn:
-                        conn.execute(text("UPDATE vision_clientes SET whatsapp=:w, vencimento=:v, status=:s, valor=:val, telas=:t WHERE nome=:n AND TRIM(LOWER(usuario_owner))=:owner"), {"w": e_w, "v": e_v, "s": e_s, "val": e_val, "t": int(e_t), "n": cli_ed["nome"], "owner": USUARIO_LOGADO})
+                        conn.execute(text("INSERT INTO vision_usuarios (username, password, role, status, tipo_conta, vencimento_usuario) VALUES (:u, :p, :r, 'Ativo', 'Final', :v)"), {"u": u_nome, "p": u_pass, "r": u_role, "v": venc})
+                    st.success("Conta revendedor adicionada!")
                     st.rerun()
-                if c_ed2.form_submit_button("🚨 Excluir"):
-                    with engine.begin() as conn:
-                        conn.execute(text("DELETE FROM vision_clientes WHERE nome=:n AND TRIM(LOWER(usuario_owner))=:owner"), {"n": cli_ed["nome"], "owner": USUARIO_LOGADO})
-                    st.rerun()
+                except: st.error("Este login já existe.")
+        st.divider()
+        with engine.connect() as conn:
+            df_users = pd.DataFrame(conn.execute(text("SELECT id, username, password, role, status, vencimento_usuario FROM vision_usuarios")).mappings().fetchall())
+        if not df_users.empty:
+            html_users = """<div style="overflow-x:auto; background-color: #111827; padding: 12px; border-radius: 8px; border: 2px solid #334155;">
+            <table style="width:100%; border-collapse: collapse; text-align: left;">
+            <thead>
+            <tr style="background-color: #1e293b; border-bottom: 2px solid #475569;">
+            <th style="padding: 6px; color: #ffffff !important; font-weight: bold;">ID</th>
+            <th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Usuário</th>
+            <th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Senha</th>
+            <th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Nível</th>
+            <th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Status</th>
+            <th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Vencimento</th>
+            </tr>
+            </thead>
+            <tbody>"""
+            for idx, row in df_users.iterrows():
+                html_users += f'<tr style="border-bottom: 1px solid #334155; background-color: #1e293b;"><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">{row["id"]}</td><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">{row["username"]}</td><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">{row["password"]}</td><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">{row["role"]}</td><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">{row["status"]}</td><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">{row["vencimento_usuario"]}</td></tr>'
+            html_users += "</tbody></table></div>"
+            st.markdown(html_users, unsafe_allow_html=True)
 
-    if ROLE_LOGADO == "ADM":
-        with abas[4]:
-            st.subheader("Gerenciar Revendedores/Usuários")
-            col_u1, col_u2 = st.columns(2)
-            
-            with col_u1:
-                st.markdown("### ➕ Criar Conta")
-                with st.form(f"f_new_usr_{USUARIO_LOGADO}", clear_on_submit=True):
-                    u_nome = st.text_input("Login:").strip().lower()
-                    u_pass = st.text_input("Senha:").strip()
-                    u_role = st.selectbox("Nível:", ["USER", "ADM"])
-                    u_dias = st.number_input("Dias de Vencimento:", min_value=1, value=30)
-                    if st.form_submit_button("Criar Conta"):
-                        venc = (hoje + timedelta(days=u_dias)).strftime("%d/%m/%Y")
-                        try:
-                            with engine.begin() as conn:
-                                conn.execute(text("INSERT INTO vision_usuarios (username, password, role, status, tipo_conta, vencimento_usuario) VALUES (:u, :p, :r, 'Ativo', 'Final', :v)"), {"u": u_nome, "p": u_pass, "r": u_role, "v": venc})
-                            st.success("Conta criada!")
-                            st.rerun()
-                        except: st.error("Login já existe.")
-            
-            with engine.connect() as conn:
-                lista_usuarios = conn.execute(text("SELECT username, password, role, status, vencimento_usuario FROM vision_usuarios ORDER BY username")).mappings().fetchall()
-            
-            with col_u2:
-                st.markdown("### ✏️ Editar / Excluir Revendedor")
-                if lista_usuarios:
-                    u_seletor = [usr["username"] for usr in lista_usuarios]
-                    sel_usr_nome = st.selectbox("Selecione o Usuário:", u_seletor, key=f"sel_usr_{USUARIO_LOGADO}")
-                    usr_ed = next(usr for usr in lista_usuarios if usr["username"] == sel_usr_nome)
-                    
-                    with st.form(f"f_ed_usr_{sel_usr_nome}"):
-                        e_u_pass = st.text_input("Senha Atual/Nova:", value=usr_ed["password"])
-                        e_u_role = st.selectbox("Nível:", ["USER", "ADM"], index=["USER", "ADM"].index(usr_ed["role"]) if usr_ed["role"] in ["USER", "ADM"] else 0)
-                        e_u_status = st.selectbox("Status:", ["Ativo", "Bloqueado"], index=["Ativo", "Bloqueado"].index(usr_ed["status"]) if usr_ed["status"] in ["Ativo", "Bloqueado"] else 0)
-                        e_u_venc = st.text_input("Vencimento:", value=usr_ed["vencimento_usuario"])
-                        
-                        c_ubtn1, c_ubtn2 = st.columns(2)
-                        if c_ubtn1.form_submit_button("💾 Salvar Alterações"):
-                            with engine.begin() as conn:
-                                conn.execute(text("UPDATE vision_usuarios SET password=:p, role=:r, status=:s, vencimento_usuario=:v WHERE username=:u"), {"p": e_u_pass, "r": e_u_role, "s": e_u_status, "v": e_u_venc, "u": sel_usr_nome})
-                            st.success("Usuário updated!")
-                            st.rerun()
-                            
-                        if c_ubtn2.form_submit_button("🚨 Deletar Conta"):
-                            if sel_usr_nome == USUARIO_LOGADO:
-                                st.error("Você não pode deletar a sua própria conta!")
-                            else:
-                                with engine.begin() as conn:
-                                    conn.execute(text("DELETE FROM vision_usuarios WHERE username = :u"), {"u": sel_usr_nome})
-                                st.success("Conta removida!")
-                                st.rerun()
-                else: st.info("Nenhum usuário cadastrado.")
-            
-            st.divider()
-            st.markdown("### 📋 Lista Geral de Contas Cadastradas")
-            if lista_usuarios:
-                st.dataframe(pd.DataFrame(lista_usuarios), hide_index=True, use_container_width=True)
+st.divider()
+
+# --- HISTÓRICO RECOLHIDO ---
+st.subheader("💵 Seus Últimos Recebimentos")
+with st.expander("""👁️ Clique para Abrir / Esconder a Histórico de Recebimentos""", expanded=False):
+    if historico:
+        html_hist = """<div style="overflow-x:auto; background-color: #111827; padding: 8px; border-radius: 8px; border: 2px solid #334155;">
+        <table style="width:100%; border-collapse: collapse; text-align: left;">
+        <thead>
+        <tr style="background-color: #1e293b; border-bottom: 2px solid #475569;">
+        <th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Cliente</th>
+        <th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Valor</th>
+        <th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Data</th>
+        </tr>
+        </thead>
+        <tbody>"""
+        
+        for item in list(reversed(historico))[:10]:
+            html_hist += f'<tr style="border-bottom: 1px solid #334155; background-color: #1e293b;"><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">{item["cliente"]}</td><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">R$ {item["valor"]:.2f}</td><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">{item["data"]}</td></tr>'
+        html_hist += "</tbody></table></div>"
+        st.markdown(html_hist, unsafe_allow_html=True)
+    else: 
+        st.info("Nenhum registro seu encontrado.")
