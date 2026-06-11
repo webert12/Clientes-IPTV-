@@ -45,30 +45,36 @@ st.markdown("""
     h1, h2, h3, h4, h5, h6 { color: #ffffff !important; font-weight: 800 !important; }
     p, span, label, .stMarkdown, [data-testid="stWidgetLabel"] p { color: #f1f5f9 !important; font-size: 16px !important; font-weight: 600 !important; }
     
-    /* 5. CORREÇÃO COMPLETA DAS CAIXAS DE SELEÇÃO (SELECTBOX / DROPDOWN TEXTO INVISÍVEL) */
+    /* 5. CORREÇÃO RADICAL PARA CAIXAS DE SELEÇÃO E TEXTOS INVISÍVEIS (SELECTBOX / DROPDOWN / SEARCH) */
     div[data-baseweb="select"] > div {
         background-color: #1e293b !important;
         color: #ffffff !important;
         border: 2px solid #64748b !important;
     }
-    div[data-baseweb="select"] span, div[data-baseweb="select"] div {
+    
+    /* Forçar texto visível ao digitar na caixa de busca de clientes */
+    div[data-baseweb="select"] input, input[role="combobox"] {
+        color: #ffffff !important;
+        background-color: transparent !important;
+        -webkit-text-fill-color: #ffffff !important;
+    }
+
+    /* Alvo nos elementos flutuantes globais injetados na raiz da página */
+    [data-baseweb="popover"], [data-baseweb="menu"], [role="listbox"], [role="option"], li[role="option"] {
+        background-color: #1e293b !important;
         color: #ffffff !important;
     }
     
-    /* Opções internas do menu suspenso ao clicar no celular */
-    div[data-baseweb="popover"] div[role="listbox"], div[role="listbox"] {
-        background-color: #1e293b !important;
+    [role="listbox"] *, [role="option"] *, li[role="option"] * {
         color: #ffffff !important;
-    }
-    div[role="listbox"] li, [data-baseweb="select"] li {
-        background-color: #1e293b !important;
-        color: #ffffff !important;
-    }
-    div[role="listbox"] li:hover, [data-baseweb="select"] li:hover {
-        background-color: #334155 !important;
     }
 
-    /* 6. CORREÇÃO DOS TEXTOS DO POPOVER (MENU DO SISTEMA CORES) */
+    li[role="option"]:hover, li[role="option"]:hover * {
+        background-color: #2563eb !important;
+        color: #ffffff !important;
+    }
+    
+    /* 6. CORREÇÃO INTEGRAL DO POPOVER (⚙️ CONFIGURAÇÕES) VISIBILIDADE */
     div[data-testid="stPopover"] button {
         background-color: #2563eb !important;
         color: #ffffff !important;
@@ -79,11 +85,10 @@ st.markdown("""
     div[data-testid="stPopover"] button p {
         color: #ffffff !important;
     }
-    div[data-baseweb="popover"] {
+    
+    /* Forçar caixa interna do Popover Aberto a ficar escura com texto branco */
+    div[data-testid="stPopoverBody"], div[data-testid="stPopoverBody"] *, div[data-testid="stPopoverBody"] p {
         background-color: #1e293b !important;
-        border: 2px solid #475569 !important;
-    }
-    div[data-baseweb="popover"] * {
         color: #ffffff !important;
     }
 
@@ -135,7 +140,7 @@ st.markdown("""
         border-right: 2px solid #334155 !important;
     }
 
-    /* 11. GARANTIR VISIBILIDADE ABSOLUTA DE TEXTOS DENTRO DE TABELAS */
+    /* 11. GARANTIR VISIBILIDADE ABSOLUTA DE TEXTOS DENTRO DE TABELAS HTML */
     table, tr, td, th {
         color: #ffffff !important;
         font-size: 14px !important;
@@ -241,7 +246,7 @@ if not st.session_state["logado"]:
 USUARIO_LOGADO = st.session_state["usuario_nome"]
 ROLE_LOGADO = st.session_state["usuario_role"]
 
-# --- LATERAL INFORMATIVA CORRIGIDA ---
+# --- BARRA LATERAL (SIDEBAR) ---
 with st.sidebar:
     st.markdown("## 📋 Menu Vision Play")
     st.markdown(f"👤 **Usuário:** `{USUARIO_LOGADO}`")
@@ -251,15 +256,15 @@ with st.sidebar:
         st.session_state.clear()
         st.rerun()
 
-# --- HEADER COM O TÍTULO E RETORNO DO BOTÃO DE CONFIGURAÇÕES (POPOVER) ---
+# --- BLOCCO SUPERIOR COM TÍTULO E BOTÃO POPOVER RESTAURADO ---
 col_titulo, col_menu = st.columns([3, 1])
 with col_titulo:
     st.markdown("<h1 style='padding-left: 55px; margin-top: -10px;'>📊 Dashboard Vision Play TV</h1>", unsafe_allow_html=True)
 
 with col_menu:
-    # Retorno do Botão de Menu com as Configurações originais via Popover solicitado
+    # Retorno completo do botão de menu Popover com as configurações solicitadas
     with st.popover("⚙️ Configurações", use_container_width=True):
-        st.markdown("<h4 style='margin:0; padding:0;'>Ajustes Globais</h4>", unsafe_allow_html=True)
+        st.markdown("<h4>🔧 Opções do Sistema</h4>", unsafe_allow_html=True)
         st.divider()
         if ROLE_LOGADO == "ADM":
             if st.button("🔄 Sincronizar Banco", use_container_width=True, key="pop_sync"):
@@ -270,35 +275,18 @@ with col_menu:
 
 def carregar_dados_privados(dono_da_conta):
     with engine.connect() as conn:
-        # Uso do .mappings() para blindagem total contra nomes invisíveis ou desalinhados
-        res_clientes = conn.execute(text("SELECT nome, whatsapp, vencimento, status, valor, telas FROM vision_clientes WHERE TRIM(LOWER(COALESCE(usuario_owner, 'admin'))) = TRIM(LOWER(:u)) ORDER BY nome"), {"u": dono_da_conta}).mappings().fetchall()
-        res_historico = conn.execute(text("SELECT cliente, valor, data FROM vision_historico WHERE TRIM(LOWER(COALESCE(usuario_owner, 'admin'))) = TRIM(LOWER(:u)) ORDER BY id ASC"), {"u": dono_da_conta}).mappings().fetchall()
-        
-        return [
-            {
-                "nome": r["nome"], 
-                "whatsapp": r["whatsapp"], 
-                "vencimento": r["vencimento"], 
-                "status": r["status"], 
-                "valor": float(r["valor"] or 0), 
-                "telas": int(r["telas"] or 1)
-            } for r in res_clientes
-        ], [
-            {
-                "cliente": r["cliente"], 
-                "valor": float(r["valor"] or 0), 
-                "data": r["data"]
-            } for r in res_historico
-        ]
+        res_clientes = conn.execute(text("SELECT nome, whatsapp, vencimento, status, valor, telas FROM vision_clientes WHERE TRIM(LOWER(COALESCE(usuario_owner, 'admin'))) = TRIM(LOWER(:u)) ORDER BY nome"), {"u": dono_da_conta}).fetchall()
+        res_historico = conn.execute(text("SELECT cliente, valor, data FROM vision_historico WHERE TRIM(LOWER(COALESCE(usuario_owner, 'admin'))) = TRIM(LOWER(:u)) ORDER BY id ASC"), {"u": dono_da_conta}).fetchall()
+        return [{"nome": r[0], "whatsapp": r[1], "vencimento": r[2], "status": r[3], "valor": float(r[4] or 0), "telas": int(r[5] or 1)} for r in res_clientes], [{"cliente": r[0], "valor": float(r[1] or 0), "data": r[2]} for r in res_historico]
 
 clientes, historico = carregar_dados_privados(USUARIO_LOGADO)
 
-# CÁLCULOS DOS CONTADORES DO PAINEL
+# CÁLCULOS DOS CONTADORES DO PAINEL E SINCRONIZAÇÃO DA PIZZA
 total_clientes = len(clientes)
 em_dia, vencendo, vencidos = 0, 0, 0
 receita_prevista, receita_recebida = 0, 0
 
-# Variáveis para cálculo financeiro preciso do gráfico de pizza
+# Contadores financeiros dedicados ao gráfico de pizza dinâmico conforme pagamentos mudam
 valor_pago = 0.0
 valor_vencido = 0.0
 valor_a_vencer = 0.0
@@ -307,20 +295,16 @@ for cl in clientes:
     receita_prevista += cl["valor"]
     status_limpo = str(cl["status"]).strip().lower()
     
+    # Sincronização direta dos valores com base no que está salvo e acontecendo no banco
     if status_limpo in ["em dia", "recebido", "pago"]:
         valor_pago += cl["valor"]
+        em_dia += 1
     elif status_limpo in ["vencido", "vencidos"]:
         valor_vencido += cl["valor"]
-    else:
+        vencidos += 1
+    else: # pendente / vencendo / vendendo
         valor_a_vencer += cl["valor"]
-
-    try:
-        v_dt = datetime.strptime(cl["vencimento"], "%d/%m/%Y").date()
-        dias = (v_dt - hoje).days
-        if dias < 0: vencidos += 1
-        elif dias <= 2: vencendo += 1
-        else: em_dia += 1
-    except: em_dia += 1
+        vencendo += 1
 
 for item in historico: receita_recebida += item["valor"]
 receita_pendente = max(0.0, receita_prevista - receita_recebida)
@@ -334,7 +318,7 @@ with st.container():
 
 st.divider()
 
-# --- GRÁFICOS EM PIZZA TRANSPARENTES ---
+# --- INTEGRANDO GRÁFICOS EM PIZZA TRANSPARENTES (MUDANÇA EM TEMPO REAL) ---
 col1, col2 = st.columns(2)
 with col1:
     if total_clientes > 0:
@@ -361,31 +345,23 @@ with col2:
 
 st.divider()
 
-# --- TABELA COMPACTA COM CORREÇÃO E BLINDAGEM DE COR DOS NOMES ---
+# --- TABELA COMPACTA COM SEPARAÇÃO INDEPENDENTE DE CORES ---
 st.subheader("📋 Lista de Clientes e Situação")
 with st.expander("👁️ Clique para Abrir / Esconder a Lista de Clientes", expanded=False):
     if clientes:
-        html_table = '<div style="overflow-x:auto; background-color: #111827; padding: 6px; border-radius: 8px; border: 2px solid #334155;"><table style="width:100%; border-collapse: collapse; text-align: left;"><thead><tr style="background-color: #1e293b; border-bottom: 2px solid #64748b;"><th style="padding: 8px; color: #ffffff !important; font-size: 14px; font-weight: bold;">Nome</th><th style="padding: 8px; color: #ffffff !important; font-size: 14px; font-weight: bold;">WhatsApp</th><th style="padding: 8px; color: #ffffff !important; font-size: 14px; font-weight: bold;">Vencimento</th><th style="padding: 8px; color: #ffffff !important; font-size: 14px; font-weight: bold;">Status</th><th style="padding: 8px; color: #ffffff !important; font-size: 14px; font-weight: bold;">Valor</th><th style="padding: 8px; color: #ffffff !important; font-size: 14px; font-weight: bold;">Telas</th></tr></thead><tbody>'
+        html_table = '<div style="overflow-x:auto; background-color: #111827; padding: 6px; border-radius: 8px; border: 2px solid #334155;"><table style="width:100%; border-collapse: collapse; text-align: left;"><thead><tr style="background-color: #1e293b; border-bottom: 2px solid #64748b;"><th style="padding: 6px; color: #ffffff !important; font-size: 14px;">Nome</th><th style="padding: 6px; color: #ffffff !important; font-size: 14px;">WhatsApp</th><th style="padding: 6px; color: #ffffff !important; font-size: 14px;">Vencimento</th><th style="padding: 6px; color: #ffffff !important; font-size: 14px;">Status</th><th style="padding: 6px; color: #ffffff !important; font-size: 14px;">Valor</th><th style="padding: 6px; color: #ffffff !important; font-size: 14px;">Telas</th></tr></thead><tbody>'
         for c in clientes:
             status_limpo = str(c["status"]).strip().lower()
             
+            # Separação visual limpa e real de cores para cada tipo de situação
             if status_limpo in ["em dia", "recebido", "pago"]:
-                bg = "#065f46"  
+                bg = "#065f46"  # Verde escuro nítido para pagantes
             elif status_limpo in ["vencido", "vencidos"]:
-                bg = "#991b1b"  
+                bg = "#991b1b"  # Vermelho fechado para vencidos
             else:
-                bg = "#854d0e"  
+                bg = "#854d0e"  # Amarelo/Ouro escuro para pendentes / vencendo ou vendendo
                 
-            # Estilo inline "color: #ffffff !important" reforçado em cada célula para máxima nitidez
-            html_table += f'<tr style="background-color: {bg}; border-bottom: 1px solid #475569;">'
-            html_table += f'<td style="padding: 8px; color: #ffffff !important; font-weight: bold; font-size: 14px;">{c["nome"]}</td>'
-            html_table += f'<td style="padding: 8px; color: #ffffff !important; font-size: 14px;">{c["whatsapp"]}</td>'
-            html_table += f'<td style="padding: 8px; color: #ffffff !important; font-size: 14px;">{c["vencimento"]}</td>'
-            html_table += f'<td style="padding: 8px; color: #ffffff !important; font-size: 14px;">{c["status"]}</td>'
-            html_table += f'<td style="padding: 8px; color: #ffffff !important; font-size: 14px;">R$ {c["valor"]:.2f}</td>'
-            html_table += f'<td style="padding: 8px; color: #ffffff !important; font-size: 14px;">{c["telas"]}</td>'
-            html_table += '</tr>'
-            
+            html_table += f'<tr style="background-color: {bg}; border-bottom: 1px solid #475569;"><td style="padding: 6px; color: #ffffff !important; font-weight: bold; font-size: 13px;">{c["nome"]}</td><td style="padding: 6px; color: #ffffff !important; font-size: 13px;">{c["whatsapp"]}</td><td style="padding: 6px; color: #ffffff !important; font-size: 13px;">{c["vencimento"]}</td><td style="padding: 6px; color: #ffffff !important; font-size: 13px;">{c["status"]}</td><td style="padding: 6px; color: #ffffff !important; font-size: 13px;">R$ {c["valor"]:.2f}</td><td style="padding: 6px; color: #ffffff !important; font-size: 13px;">{c["telas"]}</td></tr>'
         html_table += "</tbody></table></div>"
         st.markdown(html_table, unsafe_allow_html=True)
     else: st.info("Nenhum cliente cadastrado.")
@@ -481,10 +457,4 @@ st.divider()
 st.subheader("💵 Seus Últimos Recebimentos")
 with st.expander("👁️ Clique para Abrir / Esconder o Histórico de Recebimentos", expanded=False):
     if historico:
-        html_hist = '<div style="overflow-x:auto; background-color: #111827; padding: 8px; border-radius: 8px; border: 2px solid #334155;"><table style="width:100%; border-collapse: collapse; text-align: left;"><thead><tr style="background-color: #1e293b; border-bottom: 2px solid #475569;"><th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Cliente</th><th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Valor</th><th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Data</th></tr></thead><tbody>'
-        for item in list(reversed(historico))[:10]:
-            html_hist += f'<tr style="border-bottom: 1px solid #334155; background-color: #1e293b;"><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">{item["cliente"]}</td><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">R$ {item["valor"]:.2f}</td><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">{item["data"]}</td></tr>'
-        html_hist += "</tbody></table></div>"
-        st.markdown(html_hist, unsafe_allow_html=True)
-    else: 
-        st.info("Nenhum registro seu encontrado.")
+        html_hist = '<div style="overflow-x:auto; background-color: #111827; padding: 8px; border-radius: 8px; border: 2px solid #334155;"><table style="width:100%; border-collapse: collapse; text-align: left;"><thead><tr style="background-color: #1e29
