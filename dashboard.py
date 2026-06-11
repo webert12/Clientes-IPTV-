@@ -345,7 +345,7 @@ st.divider()
 
 # --- TABELA COMPACTA COM SEPARAÇÃO INDEPENDENTE DE CORES (PROTEÇÃO COM ASPAS TRIPLAS) ---
 st.subheader("📋 Lista de Clientes e Situação")
-with st.expander("👁️ Clique para Abrir / Esconder a Lista de Clientes", expanded=False):
+with st.expander("""👁️ Clique para Abrir / Esconder a Lista de Clientes""", expanded=False):
     if clientes:
         html_table = """<div style="overflow-x:auto; background-color: #111827; padding: 6px; border-radius: 8px; border: 2px solid #334155;">
         <table style="width:100%; border-collapse: collapse; text-align: left;">
@@ -475,6 +475,13 @@ if ROLE_LOGADO == "ADM":
 
 st.divider()
 
-# --- HISTÓRICO RECOLHIDO (PROTEÇÃO COM ASPAS TRIPLAS FIXING SYNTAXERROR) ---
+# --- HISTÓRICO RECOLHIDO (PROTEÇÃO COM ASPAS TRIPLAS TOTAL) ---
 st.subheader("💵 Seus Últimos Recebimentos")
-with st.expander("👁️ Clique para Abrir /
+with st.expander("""👁️ Clique para Abrir / Esconder o Histórico de Recebimentos""", expanded=False):
+    if historico:
+        html_hist = """<div style="overflow-x:auto; background-color: #111827; padding: 8px; border-radius: 8px; border: 2px solid #334155;">
+        <table style="width:100%; border-collapse: collapse; text-align: left;">
+        <thead>
+        <tr style="background-color: #1e293b; border-bottom: 2px solid #475569;">
+        <th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Cliente</th>
+        <th style="padding: 6px; color: #ffffff !important
