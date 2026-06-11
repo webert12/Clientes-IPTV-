@@ -8,7 +8,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
 
 # Configuração da página - Mantendo oculta por padrão para usar o layout customizado
-st.set_page_config(page_title="Vision Play TV", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Vision Play TV", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
 
 # --- CSS ULTRA REFORÇADO CONTRA FALHAS VISUAIS EM DISPOSITIVOS MÓVEIS ---
 st.markdown("""
@@ -249,6 +249,9 @@ ROLE_LOGADO = st.session_state["usuario_role"]
 # --- BARRA LATERAL (SIDEBAR) ---
 with st.sidebar:
     st.markdown("## 📋 Menu Vision Play")
+    # Menu de Navegação criado aqui
+    menu_selecionado = st.radio("Navegação", ["📊 Dashboard", "👥 Clientes"])
+    st.divider()
     st.markdown(f"👤 **Usuário:** `{USUARIO_LOGADO}`")
     st.markdown(f"🎖️ **Nível:** `{ROLE_LOGADO}`")
     st.divider()
@@ -256,22 +259,7 @@ with st.sidebar:
         st.session_state.clear()
         st.rerun()
 
-# --- BLOCO SUPERIOR COM TÍTULO E BOTÃO POPOVER ---
-col_titulo, col_menu = st.columns([3, 1])
-with col_titulo:
-    st.markdown("<h1 style='padding-left: 55px; margin-top: -10px;'>📊 Dashboard Vision Play TV</h1>", unsafe_allow_html=True)
-
-with col_menu:
-    with st.popover("⚙️ Configurações", use_container_width=True):
-        st.markdown("<h4>🔧 Opções do Sistema</h4>", unsafe_allow_html=True)
-        st.divider()
-        if ROLE_LOGADO == "ADM":
-            if st.button("🔄 Sincronizar Banco", use_container_width=True, key="pop_sync"):
-                st.rerun()
-        if st.button("🚪 Sair do Sistema", use_container_width=True, key="pop_sair"):
-            st.session_state.clear()
-            st.rerun()
-
+# Função para carregar dados
 def carregar_dados_privados(dono_da_conta):
     with engine.connect() as conn:
         res_clientes = conn.execute(text("SELECT nome, whatsapp, vencimento, status, valor, telas FROM vision_clientes WHERE TRIM(LOWER(COALESCE(usuario_owner, 'admin'))) = TRIM(LOWER(:u)) ORDER BY nome"), {"u": dono_da_conta}).fetchall()
@@ -280,155 +268,239 @@ def carregar_dados_privados(dono_da_conta):
 
 clientes, historico = carregar_dados_privados(USUARIO_LOGADO)
 
-# CÁLCULOS DOS CONTADORES DO PAINEL
-total_clientes = len(clientes)
-em_dia, vencendo, vencidos = 0, 0, 0
-receita_prevista, receita_recebida = 0, 0
-valor_pago = 0.0
-valor_vencido = 0.0
-valor_a_vencer = 0.0
-
-for cl in clientes:
-    receita_prevista += cl["valor"]
-    status_limpo = str(cl["status"]).strip().lower()
-    
-    if status_limpo in ["em dia", "recebido", "pago"]:
-        valor_pago += cl["valor"]
-        em_dia += 1
-    elif status_limpo in ["vencido", "vencidos"]:
-        valor_vencido += cl["valor"]
-        vencidos += 1
-    else:
-        valor_a_vencer += cl["valor"]
-        vencendo += 1
-
-for item in historico: receita_recebida += item["valor"]
-receita_pendente = max(0.0, receita_prevista - receita_recebida)
-
-with st.container():
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("👥 Seus Clientes", total_clientes)
-    c2.metric("💰 Sua Previsão", f"R$ {receita_prevista:.2f}")
-    c3.metric("✅ Seu Recebido", f"R$ {receita_recebida:.2f}")
-    c4.metric("⚠️ Seu Pendente", f"R$ {receita_pendente:.2f}")
-
-st.divider()
-
-# --- INTEGRANDO GRÁFICOS EM PIZZA TRANSPARENTES ---
-col1, col2 = st.columns(2)
-with col1:
-    if total_clientes > 0:
-        df_cli = pd.DataFrame({"Status": ["Em Dia", "Vencendo", "Vencidos"], "Qtd": [em_dia, vencendo, vencidos]})
-        df_cli = df_cli[df_cli["Qtd"] > 0]
-        fig_cli = px.pie(df_cli, names="Status", values="Qtd", title="Situação dos Clientes (Quantidade)",
-                         color="Status", color_discrete_map={"Em Dia": "#10b981", "Vencendo": "#f59e0b", "Vencidos": "#ef4444"})
-        fig_cli.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='#ffffff', title_font_color='#ffffff', legend_font_color='#ffffff')
-        st.plotly_chart(fig_cli, use_container_width=True, config={'displayModeBar': False})
-
-with col2:
-    if receita_prevista > 0:
-        df_fin = pd.DataFrame({
-            "Tipo": ["Pago", "Vencido", "A Vencer"], 
-            "Valor": [valor_pago, valor_vencido, valor_a_vencer]
-        })
-        df_fin = df_fin[df_fin["Valor"] > 0]
-        fig_fin = px.pie(df_fin, names="Tipo", values="Valor", title="Divisão Financeira (R$)",
-                         color="Tipo", color_discrete_map={"Pago": "#10b981", "Vencido": "#ef4444", "A Vencer": "#f59e0b"})
-        fig_fin.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='#ffffff', title_font_color='#ffffff', legend_font_color='#ffffff')
-        st.plotly_chart(fig_fin, use_container_width=True, config={'displayModeBar': False})
-
-st.divider()
-
-# --- SEÇÃO SEPARADA: TABELA DE CLIENTES (COM CORES) ---
-st.subheader("📋 Tabela de Clientes")
-with st.expander("👁️ Ver Listagem de Clientes", expanded=True):
-    if clientes:
-        html_table = """<div style="overflow-x:auto; background-color: #111827; padding: 12px; border-radius: 8px; border: 2px solid #334155;">
-        <table style="width:100%; border-collapse: collapse; text-align: left;">
-        <thead>
-        <tr style="background-color: #1e293b; border-bottom: 2px solid #64748b;">
-        <th style="padding: 10px; color: #ffffff !important;">Nome</th>
-        <th style="padding: 10px; color: #ffffff !important;">Status</th>
-        <th style="padding: 10px; color: #ffffff !important;">Vencimento</th>
-        </tr>
-        </thead>
-        <tbody>"""
-        
-        for c in clientes:
-            status = str(c["status"]).strip().lower()
-            # Lógica de cores: Verde para pagos/em dia, Vermelho para o resto
-            if status in ["em dia", "pago", "recebido"]:
-                cor_status = "#10b981" # Verde
-            else:
-                cor_status = "#ef4444" # Vermelho
-            
-            html_table += f'''
-            <tr style="border-bottom: 1px solid #334155; background-color: #1e293b;">
-                <td style="padding: 10px; color: #ffffff !important;">{c["nome"]}</td>
-                <td style="padding: 10px; color: {cor_status} !important; font-weight: bold;">{c["status"].capitalize()}</td>
-                <td style="padding: 10px; color: #ffffff !important;">{c["vencimento"]}</td>
-            </tr>'''
-            
-        html_table += "</tbody></table></div>"
-        st.markdown(html_table, unsafe_allow_html=True)
-    else:
-        st.info("Nenhum cliente cadastrado.")
-
-st.divider()
-
 # ======================================
-# ABAS DE GESTÃO DO SISTEMA
+# LÓGICA DE PÁGINAS SEPARADAS
 # ======================================
-st.subheader("⚙️ Gerenciamento")
-abas_disponiveis = ["💵 Registrar Pagamento", "➕ Novo Cliente", "📥 Importar Massa", "✏️ Editar / Excluir"]
-if ROLE_LOGADO == "ADM": abas_disponiveis.append("👤 Painel ADM (Contas)")
-abas = st.tabs(abas_disponiveis)
 
-with abas[0]:
-    if clientes:
-        sel = st.selectbox("Escolha o Cliente:", [c["nome"] for c in clientes], key="sb_p")
-        cli = next(c for c in clientes if c["nome"] == sel)
-        st.write(f"💰 Valor: **R$ {cli['valor']:.2f}**")
-        if st.button("⚡ Confirmar Pagamento", use_container_width=True):
-            prox_venc = (datetime.strptime(cli["vencimento"], "%d/%m/%Y") + timedelta(days=30)).strftime("%d/%m/%Y")
-            with engine.begin() as conn:
-                conn.execute(text("UPDATE vision_clientes SET status = 'Em Dia', vencimento = :v WHERE nome = :n AND usuario_owner = :o"), {"v": prox_venc, "n": cli["nome"], "o": USUARIO_LOGADO})
-                conn.execute(text("INSERT INTO vision_historico (cliente, valor, data, usuario_owner) VALUES (:c, :v, :d, :o)"), {"c": cli["nome"], "v": cli["valor"], "d": agora_br.strftime("%d/%m/%Y %H:%M"), "o": USUARIO_LOGADO})
-            st.success("Pagamento registrado!")
-            st.rerun()
+if menu_selecionado == "📊 Dashboard":
+    # --- BLOCO SUPERIOR COM TÍTULO E BOTÃO POPOVER ---
+    col_titulo, col_menu = st.columns([3, 1])
+    with col_titulo:
+        st.markdown("<h1 style='padding-left: 55px; margin-top: -10px;'>📊 Dashboard Vision Play TV</h1>", unsafe_allow_html=True)
 
-with abas[1]:
-    with st.form("f_cad", clear_on_submit=True):
-        n_nome = st.text_input("Nome:")
-        n_whats = st.text_input("WhatsApp:")
-        n_venc = st.text_input("Vencimento:", value=hoje.strftime("10/%m/%Y"))
-        n_status = st.selectbox("Status:", ["Em Dia", "Vencendo", "Vencidos"])
-        n_val = st.number_input("Valor:", min_value=0.0, value=25.0)
-        if st.form_submit_button("➕ Salvar", use_container_width=True):
-            with engine.begin() as conn:
-                conn.execute(text("INSERT INTO vision_clientes (nome, whatsapp, vencimento, status, valor, usuario_owner) VALUES (:n, :w, :v, :s, :val, :o)"), {"n": n_nome, "w": n_whats, "v": n_venc, "s": n_status, "val": n_val, "o": USUARIO_LOGADO})
-            st.rerun()
-
-with abas[2]:
-    massa = st.text_area("Cole os nomes (um por linha):", height=150)
-    if st.button("🚀 Importar", use_container_width=True):
-        for n in massa.split('\n'):
-            if n.strip():
-                with engine.begin() as conn:
-                    conn.execute(text("INSERT INTO vision_clientes (nome, status, valor, usuario_owner) VALUES (:n, 'Em Dia', 25.0, :o)"), {"n": n.strip(), "o": USUARIO_LOGADO})
-        st.rerun()
-
-with abas[3]:
-    if clientes:
-        sel_ed = st.selectbox("Selecione:", [c["nome"] for c in clientes], key="sb_e")
-        cli_ed = next(c for c in clientes if c["nome"] == sel_ed)
-        with st.form("f_ed"):
-            e_s = st.selectbox("Status:", ["Em Dia", "Vencendo", "Vencidos"], index=["Em Dia", "Vencendo", "Vencidos"].index(cli_ed["status"]) if cli_ed["status"] in ["Em Dia", "Vencendo", "Vencidos"] else 0)
-            if st.form_submit_button("Atualizar"):
-                with engine.begin() as conn:
-                    conn.execute(text("UPDATE vision_clientes SET status=:s WHERE nome=:n AND usuario_owner=:o"), {"s": e_s, "n": cli_ed["nome"], "o": USUARIO_LOGADO})
+    with col_menu:
+        with st.popover("⚙️ Configurações", use_container_width=True):
+            st.markdown("<h4>🔧 Opções do Sistema</h4>", unsafe_allow_html=True)
+            st.divider()
+            if ROLE_LOGADO == "ADM":
+                if st.button("🔄 Sincronizar Banco", use_container_width=True, key="pop_sync"):
+                    st.rerun()
+            if st.button("🚪 Sair do Sistema", use_container_width=True, key="pop_sair"):
+                st.session_state.clear()
                 st.rerun()
 
-if ROLE_LOGADO == "ADM":
-    with abas[4]:
-        st.write("Gerenciamento de contas ADM...") # Mantido lógico original
+    # CÁLCULOS DOS CONTADORES DO PAINEL E SINCRONIZAÇÃO DA PIZZA
+    total_clientes = len(clientes)
+    em_dia, vencendo, vencidos = 0, 0, 0
+    receita_prevista, receita_recebida = 0, 0
+
+    valor_pago = 0.0
+    valor_vencido = 0.0
+    valor_a_vencer = 0.0
+
+    for cl in clientes:
+        receita_prevista += cl["valor"]
+        status_limpo = str(cl["status"]).strip().lower()
+        
+        if status_limpo in ["em dia", "recebido", "pago"]:
+            valor_pago += cl["valor"]
+            em_dia += 1
+        elif status_limpo in ["vencido", "vencidos"]:
+            valor_vencido += cl["valor"]
+            vencidos += 1
+        else:
+            valor_a_vencer += cl["valor"]
+            vencendo += 1
+
+    for item in historico: receita_recebida += item["valor"]
+    receita_pendente = max(0.0, receita_prevista - receita_recebida)
+
+    with st.container():
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("👥 Seus Clientes", total_clientes)
+        c2.metric("💰 Sua Previsão", f"R$ {receita_prevista:.2f}")
+        c3.metric("✅ Seu Recebido", f"R$ {receita_recebida:.2f}")
+        c4.metric("⚠️ Seu Pendente", f"R$ {receita_pendente:.2f}")
+
+    st.divider()
+
+    # --- INTEGRANDO GRÁFICOS EM PIZZA TRANSPARENTES ---
+    col1, col2 = st.columns(2)
+    with col1:
+        if total_clientes > 0:
+            df_cli = pd.DataFrame({"Status": ["Em Dia", "Vencendo", "Vencidos"], "Qtd": [em_dia, vencendo, vencidos]})
+            df_cli = df_cli[df_cli["Qtd"] > 0]
+            fig_cli = px.pie(df_cli, names="Status", values="Qtd", title="Situação dos Clientes (Quantidade)",
+                             color="Status", color_discrete_map={"Em Dia": "#10b981", "Vencendo": "#f59e0b", "Vencidos": "#ef4444"})
+            fig_cli.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='#ffffff', title_font_color='#ffffff', legend_font_color='#ffffff')
+            st.plotly_chart(fig_cli, use_container_width=True, config={'displayModeBar': False})
+        else: st.info("Nenhum cliente para gerar gráfico.")
+
+    with col2:
+        if receita_prevista > 0:
+            df_fin = pd.DataFrame({
+                "Tipo": ["Pago", "Vencido", "A Vencer"], 
+                "Valor": [valor_pago, valor_vencido, valor_a_vencer]
+            })
+            df_fin = df_fin[df_fin["Valor"] > 0]
+            fig_fin = px.pie(df_fin, names="Tipo", values="Valor", title="Divisão Financeira (R$)",
+                             color="Tipo", color_discrete_map={"Pago": "#10b981", "Vencido": "#ef4444", "A Vencer": "#f59e0b"})
+            fig_fin.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='#ffffff', title_font_color='#ffffff', legend_font_color='#ffffff')
+            st.plotly_chart(fig_fin, use_container_width=True, config={'displayModeBar': False})
+        else: st.info("Financeiro zerado.")
+
+    st.divider()
+    
+    # --- HISTÓRICO RECOLHIDO ---
+    st.subheader("💵 Seus Últimos Recebimentos")
+    with st.expander("""👁️ Clique para Abrir / Esconder a Histórico de Recebimentos""", expanded=False):
+        if historico:
+            html_hist = """<div style="overflow-x:auto; background-color: #111827; padding: 8px; border-radius: 8px; border: 2px solid #334155;">
+            <table style="width:100%; border-collapse: collapse; text-align: left;">
+            <thead>
+            <tr style="background-color: #1e293b; border-bottom: 2px solid #475569;">
+            <th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Cliente</th>
+            <th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Valor</th>
+            <th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Data</th>
+            </tr>
+            </thead>
+            <tbody>"""
+            
+            for item in list(reversed(historico))[:10]:
+                html_hist += f'<tr style="border-bottom: 1px solid #334155; background-color: #1e293b;"><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">{item["cliente"]}</td><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">R$ {item["valor"]:.2f}</td><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">{item["data"]}</td></tr>'
+            html_hist += "</tbody></table></div>"
+            st.markdown(html_hist, unsafe_allow_html=True)
+        else: 
+            st.info("Nenhum registro seu encontrado.")
+
+elif menu_selecionado == "👥 Clientes":
+    # --- LISTA DE CLIENTES COMPACTA APENAS COM NOMES ---
+    st.subheader("👥 Nomes dos Clientes Cadastrados")
+    with st.expander("""👁️ Clique para Abrir / Esconder a Lista de Nomes""", expanded=True):
+        if clientes:
+            html_nomes = """<div style="overflow-x:auto; background-color: #111827; padding: 12px; border-radius: 8px; border: 2px solid #334155;">
+            <table style="width:100%; border-collapse: collapse; text-align: left;">
+            <thead>
+            <tr style="background-color: #1e293b; border-bottom: 2px solid #64748b;">
+            <th style="padding: 10px; color: #ffffff !important; font-size: 15px; font-weight: bold;">Nome do Cliente</th>
+            </tr>
+            </thead>
+            <tbody>"""
+            
+            for c in clientes:
+                html_nomes += f'<tr style="border-bottom: 1px solid #334155; background-color: #1e293b;"><td style="padding: 10px; color: #ffffff !important; font-weight: 600; font-size: 14px;">{c["nome"]}</td></tr>'
+                
+            html_nomes += "</tbody></table></div>"
+            st.markdown(html_nomes, unsafe_allow_html=True)
+        else: 
+            st.info("Nenhum cliente cadastrado.")
+
+    st.divider()
+
+    # ======================================
+    # ABAS DE GESTÃO E CONTEÚDOS COMPLETOS
+    # ======================================
+    st.subheader("⚙️ Gerenciamento do Sistema")
+    abas_disponiveis = ["💵 Registrar Pagamento", "➕ Novo Cliente", "📥 Importar Massa", "✏️ Editar / Excluir"]
+    if ROLE_LOGADO == "ADM": abas_disponiveis.append("👤 Painel ADM (Contas)")
+    abas = st.tabs(abas_disponiveis)
+
+    with abas[0]:
+        if clientes:
+            sel = st.selectbox("Escolha o Cliente para pagar:", [c["nome"] for c in clientes], key="sb_p")
+            cli = next(c for c in clientes if c["nome"] == sel)
+            st.write(f"💰 Valor da mensalidade: **R$ {cli['valor']:.2f}**")
+            if st.button("⚡ Confirmar Pagamento", use_container_width=True):
+                prox_venc = (datetime.strptime(cli["vencimento"], "%d/%m/%Y") + timedelta(days=30)).strftime("%d/%m/%Y")
+                with engine.begin() as conn:
+                    conn.execute(text("UPDATE vision_clientes SET status = 'Em Dia', vencimento = :v WHERE nome = :n AND usuario_owner = :o"), {"v": prox_venc, "n": cli["nome"], "o": USUARIO_LOGADO})
+                    conn.execute(text("INSERT INTO vision_historico (cliente, valor, data, usuario_owner) VALUES (:c, :v, :d, :o)"), {"c": cli["nome"], "v": cli["valor"], "d": agora_br.strftime("%d/%m/%Y %H:%M"), "o": USUARIO_LOGADO})
+                st.success("Pagamento registrado com sucesso!")
+                st.rerun()
+        else: st.info("Sem clientes.")
+
+    with abas[1]:
+        with st.form("f_cad", clear_on_submit=True):
+            n_nome = st.text_input("Nome do Cliente:")
+            n_whats = st.text_input("WhatsApp:")
+            n_venc = st.text_input("Vencimento (DD/MM/AAAA):", value=hoje.strftime("10/%m/%Y"))
+            n_status = st.selectbox("Status:", ["Em Dia", "Vencendo", "Vencidos"])
+            n_telas = st.number_input("Quantidade de Telas:", min_value=1, value=1)
+            n_val = st.number_input("Valor da Mensalidade:", min_value=0.0, value=25.0)
+            if st.form_submit_button("➕ Salvar Cliente", use_container_width=True):
+                if n_nome.strip():
+                    with engine.begin() as conn:
+                        conn.execute(text("INSERT INTO vision_clientes (nome, whatsapp, vencimento, status, valor, telas, usuario_owner) VALUES (:n, :w, :v, :s, :val, :t, :o)"), {"n": n_nome.strip(), "w": n_whats.strip(), "v": n_venc.strip(), "s": n_status, "val": n_val, "t": int(n_telas), "o": USUARIO_LOGADO})
+                    st.success("Cliente salvo!")
+                    st.rerun()
+
+    with abas[2]: # ABA IMPORTAÇÃO EM MASSA
+        st.write("📥 **Adicionar Clientes em Massa**")
+        massa_nomes = st.text_area("Cole os nomes dos clientes (um por linha):", height=150)
+        if st.button("🚀 Salvar Lista de Clientes", use_container_width=True):
+            if massa_nomes.strip():
+                lista_nomes = [n.strip() for n in massa_nomes.split('\n') if n.strip()]
+                with engine.begin() as conn:
+                    for n in lista_nomes:
+                        conn.execute(text("INSERT INTO vision_clientes (nome, whatsapp, vencimento, status, valor, telas, usuario_owner) VALUES (:n, 'Não informado', :v, 'Em Dia', 25.00, 1, :o)"), 
+                                     {"n": n, "v": hoje.strftime("%d/%m/%Y"), "o": USUARIO_LOGADO})
+                st.success(f"{len(lista_nomes)} clientes adicionados com sucesso!")
+                st.rerun()
+
+    with abas[3]:
+        if clientes:
+            sel_ed = st.selectbox("Selecione quem deseja alterar:", [c["nome"] for c in clientes], key="sb_e")
+            cli_ed = next(c for c in clientes if c["nome"] == sel_ed)
+            with st.form("f_ed"):
+                e_w = st.text_input("WhatsApp:", value=cli_ed["whatsapp"])
+                e_v = st.text_input("Vencimento:", value=cli_ed["vencimento"])
+                e_s = st.selectbox("Status:", ["Em Dia", "Vencendo", "Vencidos"], index=["Em Dia", "Vencendo", "Vencidos"].index(cli_ed["status"]) if cli_ed["status"] in ["Em Dia", "Vencendo", "Vencidos"] else 0)
+                e_t = st.number_input("Telas:", min_value=1, value=int(cli_ed["telas"]))
+                e_val = st.number_input("Valor:", min_value=0.0, value=cli_ed["valor"])
+                c_b1, c_b2 = st.columns(2)
+                if c_b1.form_submit_button("💾 Atualizar", use_container_width=True):
+                    with engine.begin() as conn:
+                        conn.execute(text("UPDATE vision_clientes SET whatsapp=:w, vencimento=:v, status=:s, valor=:val, telas=:t WHERE nome=:n AND usuario_owner=:o"), {"w": e_w, "v": e_v, "s": e_s, "val": e_val, "t": int(e_t), "n": cli_ed["nome"], "o": USUARIO_LOGADO})
+                    st.rerun()
+                if c_b2.form_submit_button("🚨 Excluir", use_container_width=True):
+                    with engine.begin() as conn:
+                        conn.execute(text("DELETE FROM vision_clientes WHERE nome=:n AND usuario_owner=:o"), {"n": cli_ed["nome"], "o": USUARIO_LOGADO})
+                    st.rerun()
+
+    if ROLE_LOGADO == "ADM":
+        with abas[4]: # Índice ajustado para 4 porque temos 4 abas anteriores
+            st.subheader("Gerenciar Revendedores / Usuários")
+            with st.form("f_new_usr", clear_on_submit=True):
+                u_nome = st.text_input("Login:").strip().lower()
+                u_pass = st.text_input("Senha:").strip()
+                u_role = st.selectbox("Nível de Acesso:", ["USER", "ADM"])
+                u_dias = st.number_input("Dias de Vencimento da Conta:", min_value=1, value=30)
+                if st.form_submit_button("Criar Nova Conta", use_container_width=True):
+                    venc = (hoje + timedelta(days=u_dias)).strftime("%d/%m/%Y")
+                    try:
+                        with engine.begin() as conn:
+                            conn.execute(text("INSERT INTO vision_usuarios (username, password, role, status, tipo_conta, vencimento_usuario) VALUES (:u, :p, :r, 'Ativo', 'Final', :v)"), {"u": u_nome, "p": u_pass, "r": u_role, "v": venc})
+                        st.success("Conta revendedor adicionada!")
+                        st.rerun()
+                    except: st.error("Este login já existe.")
+            st.divider()
+            with engine.connect() as conn:
+                df_users = pd.DataFrame(conn.execute(text("SELECT id, username, password, role, status, vencimento_usuario FROM vision_usuarios")).mappings().fetchall())
+            if not df_users.empty:
+                html_users = """<div style="overflow-x:auto; background-color: #111827; padding: 12px; border-radius: 8px; border: 2px solid #334155;">
+                <table style="width:100%; border-collapse: collapse; text-align: left;">
+                <thead>
+                <tr style="background-color: #1e293b; border-bottom: 2px solid #475569;">
+                <th style="padding: 6px; color: #ffffff !important; font-weight: bold;">ID</th>
+                <th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Usuário</th>
+                <th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Senha</th>
+                <th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Nível</th>
+                <th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Status</th>
+                <th style="padding: 6px; color: #ffffff !important; font-weight: bold;">Vencimento</th>
+                </tr>
+                </thead>
+                <tbody>"""
+                for idx, row in df_users.iterrows():
+                    html_users += f'<tr style="border-bottom: 1px solid #334155; background-color: #1e293b;"><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">{row["id"]}</td><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">{row["username"]}</td><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">{row["password"]}</td><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">{row["role"]}</td><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">{row["status"]}</td><td style="padding: 6px; color: #ffffff !important; font-weight: 600;">{row["vencimento_usuario"]}</td></tr>'
+                html_users += "</tbody></table></div>"
+                st.markdown(html_users, unsafe_allow_html=True)
