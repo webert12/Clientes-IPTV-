@@ -378,12 +378,28 @@ with abas[0]:
     if clientes:
         sel = st.selectbox("Escolha o Cliente para pagar:", [c["nome"] for c in clientes], key="sb_p")
         cli = next(c for c in clientes if c["nome"] == sel)
-        st.write(f"💰 Valor da mensalidade: **R$ {cli['valor']:.2f}**")
+        
+        # Elemento adicionado para escolher a quantidade de meses pagos adiantados
+        meses_pagos = st.number_input("Quantidade de meses pagos:", min_value=1, max_value=12, value=1, step=1, key="sb_meses_pago")
+        valor_calculado = cli['valor'] * meses_pagos
+        
+        st.write(f"💰 Valor unitário: **R$ {cli['valor']:.2f}** | Total a Registrar ({meses_pagos}x): **R$ {valor_calculado:.2f}**")
+        
         if st.button("⚡ Confirmar Pagamento", use_container_width=True):
-            prox_venc = (datetime.strptime(cli["vencimento"], "%d/%m/%Y") + timedelta(days=30)).strftime("%d/%m/%Y")
+            # Cálculo de meses exato para empurrar o vencimento sem distorcer o dia
+            venc_atual = datetime.strptime(cli["vencimento"], "%d/%m/%Y")
+            meses_totais = venc_atual.month - 1 + meses_pagos
+            ano_novo = venc_atual.year + (meses_totais // 12)
+            mes_novo = (meses_totais % 12) + 1
+            
+            # Validação para dias limite (ex: evitar que dia 31 caia num mês de 30 ou fevereiro)
+            dias_no_mes = [31, 29 if (ano_novo % 4 == 0 and (ano_novo % 100 != 0 or ano_novo % 400 == 0)) else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+            dia_novo = min(venc_atual.day, dias_no_mes[mes_novo - 1])
+            prox_venc = datetime(ano_novo, mes_novo, dia_novo).strftime("%d/%m/%Y")
+            
             with engine.begin() as conn:
                 conn.execute(text("UPDATE vision_clientes SET status = 'Em Dia', vencimento = :v WHERE nome = :n AND usuario_owner = :o"), {"v": prox_venc, "n": cli["nome"], "o": USUARIO_LOGADO})
-                conn.execute(text("INSERT INTO vision_historico (cliente, valor, data, usuario_owner) VALUES (:c, :v, :d, :o)"), {"c": cli["nome"], "v": cli["valor"], "d": agora_br.strftime("%d/%m/%Y %H:%M"), "o": USUARIO_LOGADO})
+                conn.execute(text("INSERT INTO vision_historico (cliente, valor, data, usuario_owner) VALUES (:c, :v, :d, :o)"), {"c": cli["nome"], "v": valor_calculado, "d": agora_br.strftime("%d/%m/%Y %H:%M"), "o": USUARIO_LOGADO})
             st.success("Pagamento registrado com sucesso!")
             st.rerun()
     else: st.info("Sem clientes.")
