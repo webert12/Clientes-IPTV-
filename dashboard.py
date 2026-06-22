@@ -337,30 +337,50 @@ with col2:
         df_fin = df_fin[df_fin["Valor"] > 0]
         fig_fin = px.pie(df_fin, names="Tipo", values="Valor", title="Divisão Financeira (R$)",
                          color="Tipo", color_discrete_map={"Pago": "#10b981", "Vencido": "#ef4444", "A Vencer": "#f59e0b"})
-        fig_fin.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='#ffffff', title_font_color='#ffffff', legend_font_color='#ffffff')
+        fig_fin.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='#ffffff', font_size=12, title_font_color='#ffffff', legend_font_color='#ffffff')
         st.plotly_chart(fig_fin, use_container_width=True, config={'displayModeBar': False})
     else: st.info("Financeiro zerado.")
 
 st.divider()
 
-# --- LISTA DE CLIENTES COMPACTA APENAS COM NOMES ---
-st.subheader("👥 Nomes dos Clientes Cadastrados")
-with st.expander("""👁️ Clique para Abrir / Esconder a Lista de Nomes""", expanded=False):
+# --- LISTA DE CLIENTES DETALHADA E OCULTA POR PADRÃO ---
+st.subheader("👥 Situação Detalhada dos Clientes")
+with st.expander("👁️ Clique para Abrir / Esconder a Lista de Clientes", expanded=False):
     if clientes:
-        html_nomes = """<div style="overflow-x:auto; background-color: #111827; padding: 12px; border-radius: 8px; border: 2px solid #334155;">
+        html_clientes = """<div style="overflow-x:auto; background-color: #111827; padding: 12px; border-radius: 8px; border: 2px solid #334155;">
         <table style="width:100%; border-collapse: collapse; text-align: left;">
         <thead>
         <tr style="background-color: #1e293b; border-bottom: 2px solid #64748b;">
         <th style="padding: 10px; color: #ffffff !important; font-size: 15px; font-weight: bold;">Nome do Cliente</th>
+        <th style="padding: 10px; color: #ffffff !important; font-size: 15px; font-weight: bold; text-align: center;">Status</th>
+        <th style="padding: 10px; color: #ffffff !important; font-size: 15px; font-weight: bold; text-align: center;">Vencimento (Dia/Mês)</th>
         </tr>
         </thead>
         <tbody>"""
         
         for c in clientes:
-            html_nomes += f'<tr style="border-bottom: 1px solid #334155; background-color: #1e293b;"><td style="padding: 10px; color: #ffffff !important; font-weight: 600; font-size: 14px;">{c["nome"]}</td></tr>'
+            status_limpo = str(c["status"]).strip().lower()
+            # Identificação visual através de barras/tarjetas coloridas conforme solicitado
+            if status_limpo in ["em dia", "recebido", "pago"]:
+                barra_status = '<span style="background-color: #10b981; padding: 4px 14px; border-radius: 4px; font-size: 12px; font-weight: 800; color: #ffffff; display: inline-block; min-width: 90px; text-align: center;">PAGO</span>'
+            else:
+                barra_status = '<span style="background-color: #f59e0b; padding: 4px 14px; border-radius: 4px; font-size: 12px; font-weight: 800; color: #ffffff; display: inline-block; min-width: 90px; text-align: center;">PENDENTE</span>'
             
-        html_nomes += "</tbody></table></div>"
-        st.markdown(html_nomes, unsafe_allow_html=True)
+            # Tratamento da data para exibir de forma limpa apenas o Dia e o Mês
+            try:
+                partes_data = c["vencimento"].split("/")
+                dia_mes = f"{partes_data[0]}/{partes_data[1]}"
+            except:
+                dia_mes = c["vencimento"]
+                
+            html_clientes += f"""<tr style="border-bottom: 1px solid #334155; background-color: #1e293b;">
+                <td style="padding: 10px; color: #ffffff !important; font-weight: 600; font-size: 14px;">{c["nome"]}</td>
+                <td style="padding: 10px; text-align: center;">{barra_status}</td>
+                <td style="padding: 10px; color: #38bdf8 !important; font-weight: bold; font-size: 14px; text-align: center;">{dia_mes}</td>
+            </tr>"""
+            
+        html_clientes += "</tbody></table></div>"
+        st.markdown(html_clientes, unsafe_allow_html=True)
     else: 
         st.info("Nenhum cliente cadastrado.")
 
